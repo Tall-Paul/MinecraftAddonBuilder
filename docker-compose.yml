@@ -1,0 +1,30 @@
+services:
+  addon-manager:
+    build: .
+    container_name: mc-addon-manager
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker API access
+      - addon-data:/app/data                        # Persistent DB + addon cache
+      - ./.env:/app/.env:ro                          # Config file with API keys
+    restart: unless-stopped
+
+  # ─── Example Bedrock server (uncomment to test) ──────────────────────
+  # bedrock-server:
+  #   image: itzg/minecraft-bedrock-server
+  #   container_name: bedrock-server-1
+  #   ports:
+  #     - "19132:19132/udp"
+  #   volumes:
+  #     - bedrock-data:/data
+  #   environment:
+  #     - EULA=TRUE
+  #     - SERVER_NAME=My Bedrock Server
+  #     - GAMEMODE=survival
+  #   stdin_open: true
+  #   tty: true
+
+volumes:
+  addon-data:
+  # bedrock-data:
