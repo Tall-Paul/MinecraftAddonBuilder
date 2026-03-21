@@ -72,8 +72,8 @@ export default function ServersPage() {
       </div>
 
       {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4">
-          <p className="text-red-400">
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-4 mb-4">
+          <p className="text-red-600 dark:text-red-400">
             Failed to connect to Docker: {(error as Error).message}
           </p>
           <p className="text-red-500 text-sm mt-1">
@@ -90,9 +90,9 @@ export default function ServersPage() {
 
       {servers && servers.length === 0 && (
         <div className="text-center py-16">
-          <Server className="mx-auto mb-4 text-gray-600" size={48} />
-          <p className="text-gray-400 text-lg">No Bedrock servers detected</p>
-          <p className="text-gray-500 text-sm mt-2">
+          <Server className="mx-auto mb-4 text-gray-400 dark:text-gray-600" size={48} />
+          <p className="text-gray-500 dark:text-gray-400 text-lg">No Bedrock servers detected</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
             Click "New Server" to create one, or start an existing
             itzg/minecraft-bedrock-server container
           </p>
@@ -104,16 +104,16 @@ export default function ServersPage() {
           {servers.map((server) => (
             <div
               key={server.containerId}
-              className="card flex items-center gap-4 p-4 hover:border-gray-600 transition-colors"
+              className="card flex items-center gap-4 p-4 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
             >
               {/* Status icon */}
               <div
                 className={`p-2 rounded-lg ${
                   server.status === "running"
-                    ? "bg-green-900/30 text-green-400"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                     : server.status === "paused"
-                    ? "bg-yellow-900/30 text-yellow-400"
-                    : "bg-gray-700 text-gray-400"
+                    ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                    : "bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                 }`}
               >
                 {server.status === "running" ? (
@@ -133,7 +133,7 @@ export default function ServersPage() {
                 <h3 className="font-semibold hover:text-bedrock-400 transition-colors">
                   {server.serverName || server.containerName}
                 </h3>
-                <div className="flex items-center gap-3 mt-1 text-sm text-gray-400">
+                <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
                   <span>{server.containerId}</span>
                   {server.ports.length > 0 && (
                     <>
@@ -155,10 +155,10 @@ export default function ServersPage() {
               <span
                 className={`text-xs px-2 py-1 rounded-full ${
                   server.status === "running"
-                    ? "bg-green-900/30 text-green-400"
+                    ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                     : server.status === "paused"
-                    ? "bg-yellow-900/30 text-yellow-400"
-                    : "bg-gray-700 text-gray-400"
+                    ? "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
                 }`}
               >
                 {server.status}
@@ -170,7 +170,7 @@ export default function ServersPage() {
                   <button
                     onClick={() => startMutation.mutate(server.containerId)}
                     disabled={anyLoading}
-                    className="p-1.5 rounded hover:bg-green-900/30 text-gray-400 hover:text-green-400 transition-colors"
+                    className="p-1.5 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-gray-500 dark:text-gray-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
                     title="Start"
                   >
                     <Play size={16} />
@@ -179,7 +179,7 @@ export default function ServersPage() {
                   <button
                     onClick={() => stopMutation.mutate(server.containerId)}
                     disabled={anyLoading}
-                    className="p-1.5 rounded hover:bg-red-900/30 text-gray-400 hover:text-red-400 transition-colors"
+                    className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                     title="Stop"
                   >
                     <Square size={16} />
@@ -188,7 +188,7 @@ export default function ServersPage() {
                 <button
                   onClick={() => restartMutation.mutate(server.containerId)}
                   disabled={anyLoading || server.status !== "running"}
-                  className="p-1.5 rounded hover:bg-blue-900/30 text-gray-400 hover:text-blue-400 transition-colors disabled:opacity-30"
+                  className="p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/30 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-30"
                   title="Restart"
                 >
                   <RotateCw size={16} />
@@ -201,14 +201,14 @@ export default function ServersPage() {
                     )
                   }
                   disabled={anyLoading}
-                  className="p-1.5 rounded hover:bg-red-900/30 text-gray-400 hover:text-red-400 transition-colors"
+                  className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
                   title="Delete"
                 >
                   <Trash2 size={16} />
                 </button>
                 <Link
                   to={`/servers/${server.containerId}`}
-                  className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-200 transition-colors"
+                  className="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 transition-colors"
                   title="Details"
                 >
                   <ChevronRight size={16} />

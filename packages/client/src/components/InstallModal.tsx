@@ -44,11 +44,11 @@ export default function InstallModal({ addon, onClose }: Props) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="card w-full max-w-md">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="font-semibold">Install Addon</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-200"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
           >
             <X size={20} />
           </button>
@@ -64,24 +64,24 @@ export default function InstallModal({ addon, onClose }: Props) {
                 className="w-12 h-12 rounded-lg object-cover"
               />
             ) : (
-              <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                 <span className="text-xl">🧩</span>
               </div>
             )}
             <div>
               <p className="font-medium text-sm">{addon.name}</p>
-              <p className="text-xs text-gray-400">by {addon.author}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">by {addon.author}</p>
             </div>
           </div>
 
           {/* MCPEDL warning */}
           {isMcpedl && (
-            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 flex gap-2">
+            <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg p-3 flex gap-2">
               <AlertTriangle
                 size={18}
-                className="text-yellow-400 flex-shrink-0 mt-0.5"
+                className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5"
               />
-              <div className="text-xs text-yellow-300">
+              <div className="text-xs text-yellow-700 dark:text-yellow-300">
                 <p className="font-medium">Manual download required</p>
                 <p className="mt-1">
                   MCPEDL downloads can't be automated. Please download the
@@ -100,9 +100,9 @@ export default function InstallModal({ addon, onClose }: Props) {
                   Select Server
                 </label>
                 {loadingServers ? (
-                  <p className="text-sm text-gray-400">Loading servers...</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Loading servers...</p>
                 ) : runningServers.length === 0 ? (
-                  <p className="text-sm text-red-400">
+                  <p className="text-sm text-red-600 dark:text-red-400">
                     No running Bedrock servers found. Make sure your servers are
                     running and Docker socket is connected.
                   </p>
@@ -124,16 +124,16 @@ export default function InstallModal({ addon, onClose }: Props) {
 
               {/* Status messages */}
               {installMutation.isError && (
-                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
-                  <p className="text-sm text-red-400">
+                <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-3">
+                  <p className="text-sm text-red-600 dark:text-red-400">
                     {(installMutation.error as Error).message}
                   </p>
                 </div>
               )}
 
               {installMutation.isSuccess && (
-                <div className="bg-green-900/30 border border-green-700 rounded-lg p-3">
-                  <p className="text-sm text-green-400">
+                <div className="bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
+                  <p className="text-sm text-green-600 dark:text-green-400">
                     Addon installed successfully!
                   </p>
                 </div>

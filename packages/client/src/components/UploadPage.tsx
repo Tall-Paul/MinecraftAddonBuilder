@@ -52,7 +52,7 @@ export default function UploadPage() {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Upload Addon</h2>
-      <p className="text-gray-400 mb-6">
+      <p className="text-gray-500 dark:text-gray-400 mb-6">
         Upload a .mcaddon or .mcpack file to install it on one of your servers.
         Use this for addons downloaded manually from MCPEDL or other sources.
       </p>
@@ -72,7 +72,7 @@ export default function UploadPage() {
             className={`card p-8 text-center cursor-pointer transition-colors ${
               dragOver
                 ? "border-bedrock-500 bg-bedrock-900/10"
-                : "hover:border-gray-600"
+                : "hover:border-gray-400 dark:hover:border-gray-600"
             }`}
           >
             <input
@@ -87,20 +87,20 @@ export default function UploadPage() {
               <div>
                 <CheckCircle className="mx-auto mb-2 text-bedrock-400" size={32} />
                 <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-gray-400 mt-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                   {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </p>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
                   Click to change file
                 </p>
               </div>
             ) : (
               <div>
-                <FileUp className="mx-auto mb-2 text-gray-500" size={32} />
-                <p className="text-gray-400">
+                <FileUp className="mx-auto mb-2 text-gray-400 dark:text-gray-500" size={32} />
+                <p className="text-gray-500 dark:text-gray-400">
                   Drag & drop a .mcaddon or .mcpack file here
                 </p>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
                   or click to browse
                 </p>
               </div>
@@ -114,9 +114,9 @@ export default function UploadPage() {
             Target Server
           </label>
           {loadingServers ? (
-            <p className="text-sm text-gray-400">Loading servers...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Loading servers...</p>
           ) : runningServers.length === 0 ? (
-            <p className="text-sm text-red-400">
+            <p className="text-sm text-red-600 dark:text-red-400">
               No running Bedrock servers found.
             </p>
           ) : (
@@ -137,16 +137,16 @@ export default function UploadPage() {
 
         {/* Status */}
         {uploadMutation.isError && (
-          <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
-            <p className="text-sm text-red-400">
+          <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-3">
+            <p className="text-sm text-red-600 dark:text-red-400">
               Upload failed: {(uploadMutation.error as Error).message}
             </p>
           </div>
         )}
 
         {uploadMutation.isSuccess && (
-          <div className="bg-green-900/30 border border-green-700 rounded-lg p-3">
-            <p className="text-sm text-green-400">
+          <div className="bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
+            <p className="text-sm text-green-600 dark:text-green-400">
               Addon installed successfully!
             </p>
           </div>

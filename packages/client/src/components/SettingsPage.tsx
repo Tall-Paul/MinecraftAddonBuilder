@@ -79,7 +79,7 @@ export default function SettingsPage() {
                 <option value="bridge">Bridge (port mapping)</option>
                 <option value="host">Static IP (macvlan)</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                 Bridge mode: containers share the host IP, each gets a unique port. Static IP: each container gets its own IP on your LAN.
               </p>
             </div>
@@ -102,7 +102,7 @@ export default function SettingsPage() {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     The Docker network to attach containers to (e.g. a macvlan network bridged to your LAN)
                   </p>
                 </div>
@@ -133,7 +133,7 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   New servers will auto-assign the next available IP. Each IP is pinged first to verify it's free.
                 </p>
               </>
@@ -169,7 +169,7 @@ export default function SettingsPage() {
                     />
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   New servers will auto-assign the next available port. Each port is checked for conflicts before use.
                 </p>
               </>
@@ -192,7 +192,7 @@ export default function SettingsPage() {
               placeholder="/mnt/gamedata/bedrock"
               className="input"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Host path where server data will be stored. Each server gets a subfolder named after the container.
               Leave empty to use Docker named volumes instead.
             </p>
@@ -261,7 +261,7 @@ export default function SettingsPage() {
                     onChange={(e) =>
                       update("defaultAllowCheats", e.target.checked)
                     }
-                    className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-bedrock-500 focus:ring-bedrock-500"
+                    className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-bedrock-500 focus:ring-bedrock-500"
                   />
                   <label htmlFor="defaultAllowCheats" className="text-sm">
                     Allow cheats by default
@@ -293,14 +293,14 @@ export default function SettingsPage() {
           </button>
 
           {saved && (
-            <span className="text-green-400 text-sm flex items-center gap-1">
+            <span className="text-green-600 dark:text-green-400 text-sm flex items-center gap-1">
               <CheckCircle size={16} />
               Settings saved
             </span>
           )}
 
           {mutation.isError && (
-            <span className="text-red-400 text-sm">
+            <span className="text-red-600 dark:text-red-400 text-sm">
               Failed to save: {(mutation.error as Error).message}
             </span>
           )}

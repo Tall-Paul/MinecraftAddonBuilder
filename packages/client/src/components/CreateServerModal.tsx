@@ -64,11 +64,11 @@ export default function CreateServerModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="card w-full max-w-lg">
-        <div className="flex items-center justify-between p-4 border-b border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="font-semibold">Create New Server</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-200"
+            className="text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
           >
             <X size={20} />
           </button>
@@ -88,7 +88,7 @@ export default function CreateServerModal({ onClose }: Props) {
               className="input"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               Docker container name (lowercase, no spaces)
             </p>
           </div>
@@ -106,7 +106,7 @@ export default function CreateServerModal({ onClose }: Props) {
               className="input"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
               The name shown in the server list in-game
             </p>
           </div>
@@ -166,7 +166,7 @@ export default function CreateServerModal({ onClose }: Props) {
                   id="allowCheats"
                   checked={form.allowCheats}
                   onChange={(e) => update("allowCheats", e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-bedrock-500 focus:ring-bedrock-500"
+                  className="w-4 h-4 rounded border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-bedrock-500 focus:ring-bedrock-500"
                 />
                 <label htmlFor="allowCheats" className="text-sm">
                   Allow cheats
@@ -176,17 +176,17 @@ export default function CreateServerModal({ onClose }: Props) {
           </div>
 
           {/* Auto-assigned info */}
-          <div className="bg-gray-800 rounded-lg p-3 text-xs text-gray-400 space-y-1">
+          <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 text-xs text-gray-500 dark:text-gray-400 space-y-1">
             {networkInfo && (
               <p>
-                <span className="text-gray-500">Network:</span>{" "}
-                <span className="text-gray-300">{networkInfo}</span>
+                <span className="text-gray-400 dark:text-gray-500">Network:</span>{" "}
+                <span className="text-gray-700 dark:text-gray-300">{networkInfo}</span>
               </p>
             )}
             {settings?.dataBasePath && (
               <p>
-                <span className="text-gray-500">Data path:</span>{" "}
-                <span className="text-gray-300 font-mono">
+                <span className="text-gray-400 dark:text-gray-500">Data path:</span>{" "}
+                <span className="text-gray-700 dark:text-gray-300 font-mono">
                   {settings.dataBasePath}/{form.name || "<container-name>"}
                 </span>
               </p>
@@ -195,16 +195,16 @@ export default function CreateServerModal({ onClose }: Props) {
 
           {/* Status */}
           {mutation.isError && (
-            <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
-              <p className="text-sm text-red-400">
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-3">
+              <p className="text-sm text-red-600 dark:text-red-400">
                 {(mutation.error as Error).message}
               </p>
             </div>
           )}
 
           {mutation.isSuccess && (
-            <div className="bg-green-900/30 border border-green-700 rounded-lg p-3">
-              <p className="text-sm text-green-400">
+            <div className="bg-green-100 dark:bg-green-900/30 border border-green-300 dark:border-green-700 rounded-lg p-3">
+              <p className="text-sm text-green-600 dark:text-green-400">
                 Server created and starting up!
               </p>
             </div>

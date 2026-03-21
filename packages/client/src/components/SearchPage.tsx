@@ -30,7 +30,7 @@ export default function SearchPage() {
       <form onSubmit={handleSearch} className="flex gap-3 mb-6">
         <div className="relative flex-1">
           <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400"
             size={18}
           />
           <input
@@ -63,8 +63,8 @@ export default function SearchPage() {
 
       {/* Results */}
       {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-4">
-          <p className="text-red-400">
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-4 mb-4">
+          <p className="text-red-600 dark:text-red-400">
             Search failed: {(error as Error).message}
           </p>
         </div>
@@ -77,14 +77,14 @@ export default function SearchPage() {
       )}
 
       {data && data.results.length === 0 && (
-        <p className="text-gray-400 text-center py-12">
+        <p className="text-gray-500 dark:text-gray-400 text-center py-12">
           No addons found. Try a different search term.
         </p>
       )}
 
       {data && data.results.length > 0 && (
         <>
-          <p className="text-sm text-gray-400 mb-4">
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Found {data.totalCount} result{data.totalCount !== 1 ? "s" : ""}
           </p>
 
@@ -107,7 +107,7 @@ export default function SearchPage() {
             >
               Previous
             </button>
-            <span className="text-gray-400 py-2">Page {page + 1}</span>
+            <span className="text-gray-500 dark:text-gray-400 py-2">Page {page + 1}</span>
             <button
               className="btn-secondary"
               disabled={data.results.length < 20}
@@ -121,11 +121,11 @@ export default function SearchPage() {
 
       {!searchQuery && (
         <div className="text-center py-16">
-          <Search className="mx-auto mb-4 text-gray-600" size={48} />
-          <p className="text-gray-400 text-lg">
+          <Search className="mx-auto mb-4 text-gray-400 dark:text-gray-600" size={48} />
+          <p className="text-gray-500 dark:text-gray-400 text-lg">
             Search for Minecraft Bedrock addons to get started
           </p>
-          <p className="text-gray-500 text-sm mt-2">
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
             Search CurseForge and MCPEDL for behavior packs, resource packs, and
             more
           </p>

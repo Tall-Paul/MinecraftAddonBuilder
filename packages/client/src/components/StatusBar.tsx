@@ -38,7 +38,7 @@ function StatusDot({
           connected ? "bg-green-400" : "bg-red-400"
         }`}
       />
-      <span className="text-gray-400">{label}</span>
+      <span className="text-gray-500 dark:text-gray-400">{label}</span>
     </div>
   );
 }

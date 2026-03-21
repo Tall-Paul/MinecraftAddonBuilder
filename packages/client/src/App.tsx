@@ -7,12 +7,13 @@ import UploadPage from "./components/UploadPage.js";
 import AddonDetailPage from "./components/AddonDetailPage.js";
 import SettingsPage from "./components/SettingsPage.js";
 import StatusBar from "./components/StatusBar.js";
+import ThemeToggle from "./components/ThemeToggle.js";
 
 export default function App() {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="bg-gray-800 border-b border-gray-700 px-6 py-3">
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🧱</span>
@@ -20,14 +21,17 @@ export default function App() {
               Eden's Minecraft Manager
             </h1>
           </div>
-          <StatusBar />
+          <div className="flex items-center gap-3">
+            <StatusBar />
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 
       {/* Navigation + Content */}
       <div className="flex flex-1">
         {/* Sidebar */}
-        <nav className="w-56 bg-gray-800 border-r border-gray-700 p-4 space-y-1">
+        <nav className="w-56 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 p-4 space-y-1">
           <NavItem to="/" icon={<Search size={18} />} label="Search Addons" />
           <NavItem to="/servers" icon={<Server size={18} />} label="Servers" />
           <NavItem to="/upload" icon={<Upload size={18} />} label="Upload Addon" />
@@ -68,8 +72,8 @@ function NavItem({
       className={({ isActive }) =>
         `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
           isActive
-            ? "bg-bedrock-600/20 text-bedrock-400"
-            : "text-gray-400 hover:bg-gray-700 hover:text-gray-200"
+            ? "bg-bedrock-600/20 text-bedrock-600 dark:text-bedrock-400"
+            : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-200"
         }`
       }
     >

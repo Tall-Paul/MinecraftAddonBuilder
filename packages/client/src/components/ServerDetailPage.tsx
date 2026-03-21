@@ -29,12 +29,12 @@ export default function ServerDetailPage() {
       <div>
         <Link
           to="/servers"
-          className="flex items-center gap-2 text-gray-400 hover:text-gray-200 mb-4"
+          className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4"
         >
           <ArrowLeft size={16} /> Back to servers
         </Link>
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4">
-          <p className="text-red-400">
+        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-4">
+          <p className="text-red-600 dark:text-red-400">
             {error ? (error as Error).message : "Server not found"}
           </p>
         </div>
@@ -62,7 +62,7 @@ export default function ServerDetailPage() {
     <div>
       <Link
         to="/servers"
-        className="flex items-center gap-2 text-gray-400 hover:text-gray-200 mb-4"
+        className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4"
       >
         <ArrowLeft size={16} /> Back to servers
       </Link>
@@ -74,9 +74,9 @@ export default function ServerDetailPage() {
             <h2 className="text-2xl font-bold">
               {server.serverName || server.containerName}
             </h2>
-            <div className="flex items-center gap-3 mt-2 text-sm text-gray-400">
+            <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
               <span>{server.image}</span>
-              <span>|</span>
+              <span className="text-gray-400 dark:text-gray-600">|</span>
               <span>ID: {server.containerId}</span>
             </div>
           </div>
@@ -94,8 +94,8 @@ export default function ServerDetailPage() {
           <span
             className={`text-xs px-2 py-1 rounded-full ${
               server.status === "running"
-                ? "bg-green-900/30 text-green-400"
-                : "bg-gray-700 text-gray-400"
+                ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                : "bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
             }`}
           >
             {server.status}
@@ -129,9 +129,9 @@ export default function ServerDetailPage() {
 
       {installations.length === 0 ? (
         <div className="card p-8 text-center">
-          <Package className="mx-auto mb-3 text-gray-600" size={36} />
-          <p className="text-gray-400">No addons installed via this manager</p>
-          <p className="text-gray-500 text-sm mt-1">
+          <Package className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
+          <p className="text-gray-500 dark:text-gray-400">No addons installed via this manager</p>
+          <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
             Search for addons or upload a .mcaddon file to get started
           </p>
         </div>
@@ -152,15 +152,15 @@ export default function ServerDetailPage() {
                 <div>
                   <h4 className="font-medium text-sm">{inst.addon_name}</h4>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
                       {inst.addon_source}
                     </span>
-                    <span className="text-xs text-gray-600">|</span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-400 dark:text-gray-600">|</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
                       {packs.length} pack{packs.length !== 1 ? "s" : ""}
                     </span>
-                    <span className="text-xs text-gray-600">|</span>
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-400 dark:text-gray-600">|</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">
                       {new Date(inst.installed_at).toLocaleDateString()}
                     </span>
                   </div>
@@ -170,8 +170,8 @@ export default function ServerDetailPage() {
                         key={p.uuid}
                         className={`text-xs px-1.5 py-0.5 rounded ${
                           p.type === "behavior"
-                            ? "bg-purple-900/40 text-purple-400"
-                            : "bg-cyan-900/40 text-cyan-400"
+                            ? "bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400"
+                            : "bg-cyan-100 dark:bg-cyan-900/40 text-cyan-600 dark:text-cyan-400"
                         }`}
                       >
                         {p.type === "behavior" ? "BP" : "RP"}: {p.name}
@@ -203,7 +203,7 @@ export default function ServerDetailPage() {
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">{label}</p>
       <p className="text-sm font-medium mt-0.5">{value}</p>
     </div>
   );
