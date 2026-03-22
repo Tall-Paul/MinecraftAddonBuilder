@@ -1,4 +1,4 @@
-# Eden's Minecraft Manager
+# Goblin Minecraft Manager
 
 A web application for searching, downloading, and installing Minecraft Bedrock Edition addons into Docker-hosted Bedrock servers.
 

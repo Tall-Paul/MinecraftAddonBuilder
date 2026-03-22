@@ -18,7 +18,7 @@ export default function App() {
           <div className="flex items-center gap-3">
             <span className="text-2xl">🧱</span>
             <h1 className="text-xl font-bold text-bedrock-400">
-              Eden's Minecraft Manager
+              Goblin Minecraft Manager
             </h1>
           </div>
           <div className="flex items-center gap-3">
