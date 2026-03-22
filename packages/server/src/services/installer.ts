@@ -88,6 +88,9 @@ export async function installAddon(
 
       await registerPack(container, packsJsonPath, pack.uuid, pack.version);
 
+      // Register in valid_known_packs.json so the server pushes packs to clients
+      await registerValidKnownPack(container, basePath, pack);
+
       result.installedPacks.push({
         name: pack.name,
         uuid: pack.uuid,
@@ -166,6 +169,9 @@ export async function uninstallAddon(
           : "world_resource_packs.json";
       const packsJsonPath = `${basePath}/worlds/${levelName}/${packsJsonFile}`;
       await unregisterPack(container, packsJsonPath, pack.uuid);
+
+      // Unregister from valid_known_packs.json
+      await unregisterValidKnownPack(container, basePath, pack.uuid);
     } catch (err) {
       console.error(`Error removing pack ${pack.name}:`, err);
     }
@@ -236,6 +242,67 @@ async function unregisterPack(
 
   const tarBuffer = await createTarFromContent(filename, jsonContent);
   await container.putArchive(tarBuffer, { path: dir });
+}
+
+/**
+ * Register a pack in valid_known_packs.json so the server sends it to clients.
+ */
+async function registerValidKnownPack(
+  container: any,
+  basePath: string,
+  pack: ExtractedPack
+): Promise<void> {
+  const vkpPath = `${basePath}/valid_known_packs.json`;
+  let knownPacks: Array<{ file_system: string; path: string; uuid: string; version: string }> = [];
+
+  const content = await execInContainer(container, ["cat", vkpPath]);
+  if (content) {
+    try {
+      knownPacks = JSON.parse(content);
+    } catch { /* start fresh */ }
+  }
+
+  // Check if already registered
+  if (knownPacks.some((p) => p.uuid === pack.uuid)) {
+    return;
+  }
+
+  const packSubDir = pack.type === "behavior" ? "behavior_packs" : "resource_packs";
+  knownPacks.push({
+    file_system: "RawPath",
+    path: `${packSubDir}/${pack.name}`,
+    uuid: pack.uuid,
+    version: pack.version.join("."),
+  });
+
+  const jsonContent = JSON.stringify(knownPacks, null, 2);
+  const tarBuffer = await createTarFromContent("valid_known_packs.json", jsonContent);
+  await container.putArchive(tarBuffer, { path: basePath });
+}
+
+/**
+ * Remove a pack from valid_known_packs.json.
+ */
+async function unregisterValidKnownPack(
+  container: any,
+  basePath: string,
+  uuid: string
+): Promise<void> {
+  const vkpPath = `${basePath}/valid_known_packs.json`;
+  const content = await execInContainer(container, ["cat", vkpPath]);
+  if (!content) return;
+
+  let knownPacks: Array<{ file_system: string; path: string; uuid: string; version: string }>;
+  try {
+    knownPacks = JSON.parse(content);
+  } catch {
+    return;
+  }
+
+  const filtered = knownPacks.filter((p) => p.uuid !== uuid);
+  const jsonContent = JSON.stringify(filtered, null, 2);
+  const tarBuffer = await createTarFromContent("valid_known_packs.json", jsonContent);
+  await container.putArchive(tarBuffer, { path: basePath });
 }
 
 function createTarFromDirectory(dirPath: string, packName: string): Promise<Buffer> {
