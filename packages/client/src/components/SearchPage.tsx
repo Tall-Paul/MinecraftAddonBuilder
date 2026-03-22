@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { useAddonSearch } from "../hooks/useAddons.js";
 import AddonCard from "./AddonCard.js";
@@ -6,13 +7,24 @@ import InstallModal from "./InstallModal.js";
 import type { AddonSearchResult } from "../types/index.js";
 
 export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [source, setSource] = useState("all");
-  const [page, setPage] = useState(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [query, setQuery] = useState(searchParams.get("q") || "");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("q") || "");
+  const [source, setSource] = useState(searchParams.get("source") || "all");
+  const [page, setPage] = useState(Number(searchParams.get("page")) || 0);
   const [selectedAddon, setSelectedAddon] = useState<AddonSearchResult | null>(
     null
   );
+
+  // Sync state to URL params
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (searchQuery) params.q = searchQuery;
+    if (source !== "all") params.source = source;
+    if (page > 0) params.page = String(page);
+    setSearchParams(params, { replace: true });
+  }, [searchQuery, source, page, setSearchParams]);
 
   const { data, isLoading, error } = useAddonSearch(searchQuery, source, page);
 
