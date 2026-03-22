@@ -382,3 +382,104 @@ export function getInstallations(containerId: string) {
     .prepare("SELECT * FROM installations WHERE container_id = ? ORDER BY installed_at DESC")
     .all(containerId);
 }
+
+/**
+ * Repair existing installations by ensuring all packs are registered
+ * in valid_known_packs.json. Runs on startup to fix packs installed
+ * before this registration was added.
+ */
+export async function repairPackRegistrations(): Promise<void> {
+  const db = getDb();
+  const allInstallations = db.prepare("SELECT * FROM installations").all() as any[];
+
+  if (allInstallations.length === 0) {
+    console.log("Pack repair: no installations to check");
+    return;
+  }
+
+  // Group installations by container
+  const byContainer = new Map<string, any[]>();
+  for (const inst of allInstallations) {
+    const list = byContainer.get(inst.container_id) || [];
+    list.push(inst);
+    byContainer.set(inst.container_id, list);
+  }
+
+  const docker = getDockerInstance();
+
+  for (const [containerId, installations] of byContainer) {
+    try {
+      const server = await getServerDetail(containerId);
+      if (!server || server.status !== "running") {
+        console.log(`Pack repair: skipping ${containerId} (not running)`);
+        continue;
+      }
+
+      const container = docker.getContainer(containerId);
+      const basePath = await detectBasePath(container);
+
+      // Read current valid_known_packs.json
+      const vkpPath = `${basePath}/valid_known_packs.json`;
+      let knownPacks: Array<{ file_system: string; path: string; uuid: string; version: string }> = [];
+      const vkpContent = await execInContainer(container, ["cat", vkpPath]);
+      if (vkpContent) {
+        try {
+          knownPacks = JSON.parse(vkpContent);
+        } catch { /* start fresh */ }
+      }
+
+      const existingUuids = new Set(knownPacks.map((p) => p.uuid));
+      let modified = false;
+
+      for (const inst of installations) {
+        const packs = JSON.parse(inst.packs) as Array<{ name: string; uuid: string; type: string }>;
+
+        for (const pack of packs) {
+          if (existingUuids.has(pack.uuid)) continue;
+
+          // Read the manifest from the container to get the version
+          const packSubDir = pack.type === "behavior" ? "behavior_packs" : "resource_packs";
+          const manifestPath = `${basePath}/${packSubDir}/${pack.name}/manifest.json`;
+          const manifestContent = await execInContainer(container, ["cat", manifestPath]);
+
+          let version = "1.0.0";
+          if (manifestContent) {
+            try {
+              const manifest = JSON.parse(manifestContent);
+              if (manifest.header?.version) {
+                version = manifest.header.version.join(".");
+              }
+            } catch { /* use default */ }
+          }
+
+          knownPacks.push({
+            file_system: "RawPath",
+            path: `${packSubDir}/${pack.name}`,
+            uuid: pack.uuid,
+            version,
+          });
+          existingUuids.add(pack.uuid);
+          modified = true;
+          console.log(`Pack repair: registered ${pack.name} (${pack.uuid}) on ${server.containerName}`);
+        }
+      }
+
+      if (modified) {
+        const jsonContent = JSON.stringify(knownPacks, null, 2);
+        const tarBuffer = await createTarFromContent("valid_known_packs.json", jsonContent);
+        await container.putArchive(tarBuffer, { path: basePath });
+        console.log(`Pack repair: updated valid_known_packs.json on ${server.containerName}, restarting...`);
+
+        // Restart the server so it picks up the changes
+        await container.restart();
+        console.log(`Pack repair: restarted ${server.containerName}`);
+      } else {
+        console.log(`Pack repair: ${server.containerName} — all packs already registered`);
+      }
+    } catch (err) {
+      console.error(`Pack repair: error processing ${containerId}:`, err);
+    }
+  }
+
+  console.log("Pack repair: complete");
+}

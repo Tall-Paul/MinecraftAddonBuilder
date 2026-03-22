@@ -62,6 +62,13 @@ async function start() {
     console.error("CurseForge init failed:", err)
   );
 
+  // Repair pack registrations for previously installed addons (non-blocking)
+  import("./services/installer.js").then(({ repairPackRegistrations }) =>
+    repairPackRegistrations().catch((err) =>
+      console.error("Pack repair failed:", err)
+    )
+  );
+
   app.listen(config.port, () => {
     console.log(`Minecraft Addon Builder running at http://localhost:${config.port}`);
     console.log(`Docker socket: ${config.dockerSocket}`);
