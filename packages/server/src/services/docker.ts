@@ -1,5 +1,4 @@
 import Dockerode from "dockerode";
-import { PassThrough } from "stream";
 import { config } from "../config.js";
 import type { BedrockServer, ServerDetail } from "../models/server.js";
 
@@ -106,27 +105,16 @@ export async function execInContainer(
     const exec = await container.exec({
       Cmd: cmd,
       AttachStdout: true,
-      AttachStderr: true,
+      AttachStderr: false,
+      Tty: true,
     });
-    const stream = await exec.start({ Detach: false, Tty: false });
+    const stream = await exec.start({ Detach: false, Tty: true });
 
     return new Promise((resolve) => {
-      const stdout: Buffer[] = [];
-      const stderr: Buffer[] = [];
-
-      // Use Dockerode's demuxStream to properly separate stdout/stderr
-      // Docker multiplexed stream protocol uses 8-byte headers per frame
-      const d = getDocker();
-      const stdoutStream = new PassThrough();
-      const stderrStream = new PassThrough();
-
-      stdoutStream.on("data", (chunk: Buffer) => stdout.push(chunk));
-      stderrStream.on("data", (chunk: Buffer) => stderr.push(chunk));
-
-      d.modem.demuxStream(stream, stdoutStream, stderrStream);
-
+      const chunks: Buffer[] = [];
+      stream.on("data", (chunk: Buffer) => chunks.push(chunk));
       stream.on("end", () => {
-        const output = Buffer.concat(stdout).toString("utf-8").trim();
+        const output = Buffer.concat(chunks).toString("utf-8").trim();
         resolve(output || null);
       });
       stream.on("error", () => resolve(null));
