@@ -59,16 +59,20 @@ export async function getServerDetail(containerId: string): Promise<ServerDetail
     // Detect the server's base data path (varies by image)
     const basePath = await detectBasePath(container);
 
+    console.log(`getServerDetail: basePath for ${containerId} = "${basePath}"`);
+
     // Read server.properties to get level-name and server-name
     const propsContent = await execInContainer(container, [
       "cat",
       `${basePath}/server.properties`,
     ]);
+    console.log(`getServerDetail: propsContent length = ${propsContent?.length ?? 'null'}`);
     if (propsContent) {
       const props = parseProperties(propsContent);
       detail.serverName = props["server-name"];
       detail.levelName = props["level-name"];
       detail.gameMode = props["gamemode"];
+      console.log(`getServerDetail: serverName="${detail.serverName}", levelName="${detail.levelName}", gameMode="${detail.gameMode}"`);
     }
 
     const levelName = detail.levelName || "Bedrock level";
@@ -137,18 +141,24 @@ const KNOWN_BASE_PATHS = [
 /**
  * Detect the base data path inside a Bedrock server container.
  * Tries known paths and returns the first one that contains server.properties.
+ * Uses `cat` to read the first line — if it succeeds, the file exists.
  */
 export async function detectBasePath(container: Dockerode.Container): Promise<string> {
   for (const basePath of KNOWN_BASE_PATHS) {
-    const result = await execInContainer(container, [
-      "ls", `${basePath}/server.properties`,
-    ]);
-    // ls returns the path on success, null on failure
-    if (result) {
-      return basePath;
+    try {
+      const result = await execInContainer(container, [
+        "cat", `${basePath}/server.properties`,
+      ]);
+      console.log(`detectBasePath: checking ${basePath} -> got ${result ? result.length : 'null'} chars`);
+      if (result && result.includes("server-port")) {
+        console.log(`detectBasePath: detected base path: ${basePath}`);
+        return basePath;
+      }
+    } catch {
+      console.log(`detectBasePath: ${basePath} threw an error`);
     }
   }
-  // Default fallback
+  console.log("detectBasePath: no path matched, falling back to /data");
   return "/data";
 }
 
