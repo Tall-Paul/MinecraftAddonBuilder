@@ -36,7 +36,7 @@ export interface PackManifest {
     min_engine_version?: [number, number, number];
   };
   modules: Array<{
-    type: "data" | "resources" | "script";
+    type: "data" | "resources" | "client_data" | "script";
     uuid: string;
     version: [number, number, number];
   }>;

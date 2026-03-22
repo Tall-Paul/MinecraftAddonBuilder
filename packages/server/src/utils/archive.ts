@@ -18,12 +18,15 @@ export function extractAddon(filePath: string, outputDir: string): ExtractedPack
 
   // Check if this is an .mcaddon (contains .mcpack files) or a single .mcpack
   const entries = zip.getEntries();
+  console.log(`extractAddon: ${path.basename(filePath)} has ${entries.length} entries`);
+
   const mcpackEntries = entries.filter((e) =>
     e.entryName.toLowerCase().endsWith(".mcpack")
   );
 
   if (ext === ".mcaddon" && mcpackEntries.length > 0) {
     // .mcaddon containing .mcpack files
+    console.log(`extractAddon: found ${mcpackEntries.length} .mcpack files inside .mcaddon`);
     return extractMcAddon(zip, mcpackEntries, outputDir);
   }
 
@@ -34,7 +37,8 @@ export function extractAddon(filePath: string, outputDir: string): ExtractedPack
       e.entryName.endsWith("/manifest.json")
   );
 
-  if (manifestEntry) {
+  if (manifestEntry && !entries.some((e) => e.entryName.endsWith("/manifest.json") && e.entryName !== manifestEntry.entryName)) {
+    // Only one manifest — single pack
     return extractSinglePack(zip, outputDir, filePath);
   }
 
@@ -42,7 +46,13 @@ export function extractAddon(filePath: string, outputDir: string): ExtractedPack
   // Look for directories that contain manifest.json
   const packDirs = findPackDirectories(entries);
   if (packDirs.length > 0) {
+    console.log(`extractAddon: found ${packDirs.length} pack directories: ${packDirs.join(", ")}`);
     return extractPackDirectories(zip, packDirs, outputDir);
+  }
+
+  // Last resort: if there's any manifest, try as single pack
+  if (manifestEntry) {
+    return extractSinglePack(zip, outputDir, filePath);
   }
 
   console.warn(`Could not identify pack structure in ${filePath}`);
@@ -61,8 +71,10 @@ function extractMcAddon(
     const mcpackName = path.basename(entry.entryName, ".mcpack");
     const mcpackDir = path.join(outputDir, mcpackName);
 
+    console.log(`extractMcAddon: extracting inner .mcpack "${entry.entryName}"`);
+
     // Write the .mcpack to a temp file and extract it
-    const tempPath = path.join(outputDir, entry.entryName);
+    const tempPath = path.join(outputDir, path.basename(entry.entryName));
     fs.mkdirSync(path.dirname(tempPath), { recursive: true });
     fs.writeFileSync(tempPath, mcpackData);
 
@@ -71,7 +83,12 @@ function extractMcAddon(
       innerZip.extractAllTo(mcpackDir, true);
 
       const pack = parsePackDirectory(mcpackDir, mcpackName);
-      if (pack) packs.push(pack);
+      if (pack) {
+        console.log(`extractMcAddon: parsed pack "${pack.name}" type=${pack.type} uuid=${pack.uuid}`);
+        packs.push(pack);
+      } else {
+        console.warn(`extractMcAddon: failed to parse pack from "${entry.entryName}"`);
+      }
     } catch (err) {
       console.error(`Failed to extract inner .mcpack ${entry.entryName}:`, err);
     } finally {
@@ -94,6 +111,9 @@ function extractSinglePack(
   zip.extractAllTo(packDir, true);
 
   const pack = parsePackDirectory(packDir, packName);
+  if (pack) {
+    console.log(`extractSinglePack: parsed "${pack.name}" type=${pack.type} uuid=${pack.uuid}`);
+  }
   return pack ? [pack] : [];
 }
 
@@ -103,9 +123,10 @@ function findPackDirectories(entries: AdmZip.IZipEntry[]): string[] {
   for (const entry of entries) {
     if (entry.entryName.endsWith("manifest.json")) {
       // Get the directory containing manifest.json
-      const parts = entry.entryName.split("/");
-      if (parts.length >= 2) {
-        dirs.add(parts[0]);
+      const dir = entry.entryName.replace(/\/?manifest\.json$/, "");
+      if (dir) {
+        dirs.add(dir);
+        console.log(`findPackDirectories: found manifest at "${entry.entryName}" -> dir "${dir}"`);
       }
     }
   }
@@ -123,8 +144,11 @@ function extractPackDirectories(
   const packs: ExtractedPack[] = [];
   for (const dir of packDirs) {
     const packPath = path.join(outputDir, dir);
-    const pack = parsePackDirectory(packPath, dir);
-    if (pack) packs.push(pack);
+    const pack = parsePackDirectory(packPath, path.basename(dir));
+    if (pack) {
+      console.log(`extractPackDirectories: parsed "${pack.name}" type=${pack.type} uuid=${pack.uuid}`);
+      packs.push(pack);
+    }
   }
 
   return packs;
@@ -133,6 +157,8 @@ function extractPackDirectories(
 function parsePackDirectory(dirPath: string, fallbackName: string): ExtractedPack | null {
   // Look for manifest.json — could be at root or one level deep
   let manifestPath = path.join(dirPath, "manifest.json");
+  let effectiveDirPath = dirPath;
+
   if (!fs.existsSync(manifestPath)) {
     // Check one level deep
     const subdirs = fs.readdirSync(dirPath, { withFileTypes: true });
@@ -141,7 +167,7 @@ function parsePackDirectory(dirPath: string, fallbackName: string): ExtractedPac
         const nested = path.join(dirPath, sub.name, "manifest.json");
         if (fs.existsSync(nested)) {
           manifestPath = nested;
-          dirPath = path.join(dirPath, sub.name);
+          effectiveDirPath = path.join(dirPath, sub.name);
           break;
         }
       }
@@ -157,13 +183,15 @@ function parsePackDirectory(dirPath: string, fallbackName: string): ExtractedPac
     const manifest: PackManifest = JSON.parse(fs.readFileSync(manifestPath, "utf-8"));
     const packType = determinePackType(manifest);
 
+    console.log(`parsePackDirectory: "${manifestPath}" -> modules: ${JSON.stringify(manifest.modules?.map(m => m.type))}, determined type: ${packType}`);
+
     return {
       name: manifest.header?.name || fallbackName,
       uuid: manifest.header?.uuid || "",
       version: manifest.header?.version || [0, 0, 1],
       type: packType,
       manifest,
-      extractedPath: dirPath,
+      extractedPath: effectiveDirPath,
     };
   } catch (err) {
     console.error(`Failed to parse manifest at ${manifestPath}:`, err);
@@ -175,8 +203,9 @@ function determinePackType(manifest: PackManifest): "behavior" | "resource" {
   // Check modules for type
   for (const mod of manifest.modules || []) {
     if (mod.type === "data" || mod.type === "script") return "behavior";
-    if (mod.type === "resources") return "resource";
+    if (mod.type === "resources" || mod.type === "client_data") return "resource";
   }
-  // Default to behavior if we can't determine
+  // Fallback: check if there are textures/models directories referenced
+  // or if the header description hints at resource pack
   return "behavior";
 }
