@@ -135,7 +135,7 @@ export default function ServersPage() {
                 </h3>
                 <div className="flex items-center gap-3 mt-1 text-sm text-gray-500 dark:text-gray-400">
                   <span>{server.containerId}</span>
-                  {server.ports.length > 0 && (
+                  {server.ports.length > 0 ? (
                     <>
                       <span>|</span>
                       <span>
@@ -147,7 +147,12 @@ export default function ServersPage() {
                           .join(", ")}
                       </span>
                     </>
-                  )}
+                  ) : server.ipAddress ? (
+                    <>
+                      <span>|</span>
+                      <span>{server.ipAddress}</span>
+                    </>
+                  ) : null}
                 </div>
               </Link>
 

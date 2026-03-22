@@ -107,11 +107,11 @@ export default function ServerDetailPage() {
           <InfoItem label="Level Name" value={server.levelName || "—"} />
           <InfoItem label="Game Mode" value={server.gameMode || "—"} />
           <InfoItem
-            label="Ports"
+            label={server.ipAddress && server.ports.length === 0 ? "IP Address" : "Ports"}
             value={
-              server.ports
-                .map((p) => `${p.hostPort}:${p.containerPort}`)
-                .join(", ") || "—"
+              server.ports.length > 0
+                ? server.ports.map((p) => `${p.hostPort}:${p.containerPort}`).join(", ")
+                : server.ipAddress || "—"
             }
           />
           <InfoItem

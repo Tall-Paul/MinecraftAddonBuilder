@@ -23,18 +23,40 @@ export async function listBedrockServers(): Promise<BedrockServer[]> {
     )
   );
 
-  return bedrockContainers.map((c) => ({
-    containerId: c.Id.substring(0, 12),
-    containerName: c.Names[0]?.replace(/^\//, "") || c.Id.substring(0, 12),
-    image: c.Image,
-    status: c.State === "running" ? "running" : c.State === "paused" ? "paused" : "stopped",
-    ports: (c.Ports || []).map((p) => ({
-      hostPort: p.PublicPort || 0,
-      containerPort: p.PrivatePort,
-      protocol: p.Type,
-    })),
-    dataMount: c.Mounts?.find((m) => m.Destination === "/data")?.Source,
-  }));
+  return bedrockContainers.map((c) => {
+    // Extract static IP from non-default networks (e.g. macvlan, custom bridge)
+    const networks = (c as any).NetworkSettings?.Networks || {};
+    let ipAddress: string | undefined;
+    for (const [netName, netInfo] of Object.entries<any>(networks)) {
+      if (netName !== "bridge" && netName !== "host" && netName !== "none" && netInfo?.IPAddress) {
+        ipAddress = netInfo.IPAddress;
+        break;
+      }
+    }
+    // Fall back to any IP if no custom network IP found
+    if (!ipAddress) {
+      for (const netInfo of Object.values<any>(networks)) {
+        if (netInfo?.IPAddress) {
+          ipAddress = netInfo.IPAddress;
+          break;
+        }
+      }
+    }
+
+    return {
+      containerId: c.Id.substring(0, 12),
+      containerName: c.Names[0]?.replace(/^\//, "") || c.Id.substring(0, 12),
+      image: c.Image,
+      status: c.State === "running" ? "running" : c.State === "paused" ? "paused" : "stopped",
+      ports: (c.Ports || []).map((p) => ({
+        hostPort: p.PublicPort || 0,
+        containerPort: p.PrivatePort,
+        protocol: p.Type,
+      })),
+      dataMount: c.Mounts?.find((m) => m.Destination === "/data")?.Source,
+      ipAddress,
+    };
+  });
 }
 
 export async function getServerDetail(containerId: string): Promise<ServerDetail | null> {

@@ -13,6 +13,8 @@ export interface BedrockServer {
   gameMode?: string;
   /** Host-side path to the /data mount, if available */
   dataMount?: string;
+  /** Static IP address if using a custom network (e.g. macvlan) */
+  ipAddress?: string;
 }
 
 export interface ServerDetail extends BedrockServer {

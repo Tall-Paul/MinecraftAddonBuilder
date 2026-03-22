@@ -38,6 +38,7 @@ export interface BedrockServer {
   levelName?: string;
   gameMode?: string;
   dataMount?: string;
+  ipAddress?: string;
 }
 
 export interface ServerDetail extends BedrockServer {
