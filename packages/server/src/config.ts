@@ -7,7 +7,7 @@ export const config = {
   port: parseInt(process.env.PORT || "3000", 10),
   dockerSocket: process.env.DOCKER_SOCKET || "/var/run/docker.sock",
   curseforgeApiKey: process.env.CURSEFORGE_API_KEY || "",
-  bedrockImageFilter: (process.env.BEDROCK_IMAGE_FILTER || "itzg/minecraft-bedrock-server,bedrock")
+  bedrockImageFilter: (process.env.BEDROCK_IMAGE_FILTER || "itzg/minecraft-bedrock-server,binhex/arch-minecraftbedrockserver,bedrock")
     .split(",")
     .map((s) => s.trim()),
   cacheDir: process.env.CACHE_DIR || path.resolve(process.cwd(), "data/cache"),

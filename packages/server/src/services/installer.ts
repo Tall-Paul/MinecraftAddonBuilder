@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import tar from "tar-stream";
 import { Writable } from "stream";
-import { getDockerInstance, execInContainer, getServerDetail } from "./docker.js";
+import { getDockerInstance, execInContainer, getServerDetail, detectBasePath } from "./docker.js";
 import { extractAddon } from "../utils/archive.js";
 import { getDb } from "../db/index.js";
 import { config } from "../config.js";
@@ -63,11 +63,14 @@ export async function installAddon(
   const docker = getDockerInstance();
   const container = docker.getContainer(containerId);
 
+  // Detect the server's base data path
+  const basePath = await detectBasePath(container);
+
   // 3. Copy each pack into the container and register it
   for (const pack of packs) {
     try {
       const targetDir =
-        pack.type === "behavior" ? "/data/behavior_packs" : "/data/resource_packs";
+        pack.type === "behavior" ? `${basePath}/behavior_packs` : `${basePath}/resource_packs`;
 
       // Create a tar archive of the pack directory
       const tarBuffer = await createTarFromDirectory(pack.extractedPath, pack.name);
@@ -81,7 +84,7 @@ export async function installAddon(
           ? "world_behavior_packs.json"
           : "world_resource_packs.json";
 
-      const packsJsonPath = `/data/worlds/${levelName}/${packsJsonFile}`;
+      const packsJsonPath = `${basePath}/worlds/${levelName}/${packsJsonFile}`;
 
       await registerPack(container, packsJsonPath, pack.uuid, pack.version);
 
@@ -142,6 +145,7 @@ export async function uninstallAddon(
   const levelName = server.levelName || "Bedrock level";
   const docker = getDockerInstance();
   const container = docker.getContainer(containerId);
+  const basePath = await detectBasePath(container);
   const packs = JSON.parse(installation.packs) as Array<{
     name: string;
     uuid: string;
@@ -152,7 +156,7 @@ export async function uninstallAddon(
     try {
       // Remove pack directory from container
       const targetDir =
-        pack.type === "behavior" ? "/data/behavior_packs" : "/data/resource_packs";
+        pack.type === "behavior" ? `${basePath}/behavior_packs` : `${basePath}/resource_packs`;
       await execInContainer(container, ["rm", "-rf", `${targetDir}/${pack.name}`]);
 
       // Unregister from world packs JSON
@@ -160,7 +164,7 @@ export async function uninstallAddon(
         pack.type === "behavior"
           ? "world_behavior_packs.json"
           : "world_resource_packs.json";
-      const packsJsonPath = `/data/worlds/${levelName}/${packsJsonFile}`;
+      const packsJsonPath = `${basePath}/worlds/${levelName}/${packsJsonFile}`;
       await unregisterPack(container, packsJsonPath, pack.uuid);
     } catch (err) {
       console.error(`Error removing pack ${pack.name}:`, err);

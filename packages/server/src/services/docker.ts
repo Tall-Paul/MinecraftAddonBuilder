@@ -56,10 +56,13 @@ export async function getServerDetail(containerId: string): Promise<ServerDetail
     const d = getDocker();
     const container = d.getContainer(server.containerId);
 
+    // Detect the server's base data path (varies by image)
+    const basePath = await detectBasePath(container);
+
     // Read server.properties to get level-name and server-name
     const propsContent = await execInContainer(container, [
       "cat",
-      "/data/server.properties",
+      `${basePath}/server.properties`,
     ]);
     if (propsContent) {
       const props = parseProperties(propsContent);
@@ -73,7 +76,7 @@ export async function getServerDetail(containerId: string): Promise<ServerDetail
     // Read world pack registration files
     const bpJson = await execInContainer(container, [
       "cat",
-      `/data/worlds/${levelName}/world_behavior_packs.json`,
+      `${basePath}/worlds/${levelName}/world_behavior_packs.json`,
     ]);
     if (bpJson) {
       try {
@@ -83,7 +86,7 @@ export async function getServerDetail(containerId: string): Promise<ServerDetail
 
     const rpJson = await execInContainer(container, [
       "cat",
-      `/data/worlds/${levelName}/world_resource_packs.json`,
+      `${basePath}/worlds/${levelName}/world_resource_packs.json`,
     ]);
     if (rpJson) {
       try {
@@ -122,6 +125,31 @@ export async function execInContainer(
   } catch {
     return null;
   }
+}
+
+// Known base paths for different Bedrock server images
+const KNOWN_BASE_PATHS = [
+  "/data",                    // itzg/minecraft-bedrock-server
+  "/config/minecraft",        // binhex/arch-minecraftbedrockserver
+  "/srv/minecraft",           // some other images
+];
+
+/**
+ * Detect the base data path inside a Bedrock server container.
+ * Tries known paths and returns the first one that contains server.properties.
+ */
+export async function detectBasePath(container: Dockerode.Container): Promise<string> {
+  for (const basePath of KNOWN_BASE_PATHS) {
+    const result = await execInContainer(container, [
+      "ls", `${basePath}/server.properties`,
+    ]);
+    // ls returns the path on success, null on failure
+    if (result) {
+      return basePath;
+    }
+  }
+  // Default fallback
+  return "/data";
 }
 
 function parseProperties(content: string): Record<string, string> {
