@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerDetail } from "../hooks/useServers.js";
 import { useUninstallAddon } from "../hooks/useInstall.js";
 import { restartServer, opPlayerApi, deopPlayerApi } from "../api/client.js";
+import WorldMap from "./WorldMap.js";
 import type { Installation } from "../types/index.js";
 
 export default function ServerDetailPage() {
@@ -144,6 +145,9 @@ export default function ServerDetailPage() {
           />
         </div>
       </div>
+
+      {/* World Map */}
+      <WorldMap serverId={server.containerId} serverStatus={server.status} />
 
       {/* Installed Addons */}
       <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">

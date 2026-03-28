@@ -122,6 +122,22 @@ router.post("/", async (req, res) => {
   }
 });
 
+// GET /api/servers/:id/map — Generate a PNG map of the world
+router.get("/:id/map", async (req, res) => {
+  const scale = Math.min(Math.max(parseInt(req.query.scale as string) || 2, 1), 8);
+
+  try {
+    const { generateWorldMap } = await import("../services/worldmap.js");
+    const png = await generateWorldMap(req.params.id, scale);
+    res.set("Content-Type", "image/png");
+    res.set("Cache-Control", "no-cache");
+    res.send(png);
+  } catch (err: any) {
+    console.error("Failed to generate world map:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/servers/:id/start
 router.post("/:id/start", async (req, res) => {
   try {

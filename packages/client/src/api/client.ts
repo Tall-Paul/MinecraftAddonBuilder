@@ -155,6 +155,11 @@ export async function uninstallAddon(
   });
 }
 
+// World Map
+export function getWorldMapUrl(serverId: string, scale: number = 2): string {
+  return `${API_BASE}/servers/${serverId}/map?scale=${scale}&t=${Date.now()}`;
+}
+
 // Settings
 export async function getSettingsApi(): Promise<ServerDefaults> {
   return apiFetch("/settings");
