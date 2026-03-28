@@ -2,7 +2,6 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import zlib from "zlib";
-import * as fzstd from "fzstd";
 import tar from "tar-stream";
 import { PNG } from "pngjs";
 import { getDockerInstance, getServerDetail, detectBasePath } from "./docker.js";
@@ -363,24 +362,10 @@ function readBlock(data: Buffer, offset: number, size: number): Buffer | null {
       }
     }
   } else if (compressionType === 4) {
-    // Zstd (newer Bedrock versions)
-    // Try standard framed zstd first
+    // kZlibRawCompression (Mojang's LevelDB fork) — raw deflate, no zlib header
     try {
-      const decompressed = fzstd.decompress(new Uint8Array(blockData));
-      return Buffer.from(decompressed);
-    } catch (e: any) {
-      console.log(`worldmap: fzstd.decompress failed (size=${blockData.length}, first4=${blockData.subarray(0, 4).toString("hex")}): ${e?.message || e}`);
-    }
-    // Bedrock sometimes uses raw zstd (no frame header 0xFD2FB528)
-    // Try prepending a minimal frame header
-    try {
-      const ZSTD_MAGIC = Buffer.from([0x28, 0xb5, 0x2f, 0xfd]);
-      const framed = Buffer.concat([ZSTD_MAGIC, blockData]);
-      const decompressed = fzstd.decompress(new Uint8Array(framed));
-      console.log(`worldmap: raw zstd workaround succeeded`);
-      return Buffer.from(decompressed);
-    } catch (e2: any) {
-      console.log(`worldmap: framed zstd retry also failed: ${e2?.message || e2}`);
+      return zlib.inflateRawSync(blockData);
+    } catch {
       return null;
     }
   } else if (compressionType === 1) {
