@@ -259,10 +259,23 @@ function parseTableFile(data: Buffer, chunks: Map<string, ChunkInfo>): void {
   pos = metaHandle.newPos;
   const indexHandle = readBlockHandle(data, pos);
 
+  console.log(`worldmap: file ${data.length} bytes, footer at ${footerStart}, index block: offset=${indexHandle.offset} size=${indexHandle.size}`);
+
+  if (indexHandle.offset + indexHandle.size > data.length) {
+    console.log(`worldmap: index block extends past file end`);
+    return;
+  }
+
+  // Check compression type byte
+  if (indexHandle.offset + indexHandle.size < data.length) {
+    console.log(`worldmap: index block compression type byte: ${data[indexHandle.offset + indexHandle.size]}`);
+  }
+
   // Read and decompress the index block
   const indexBlock = readBlock(data, indexHandle.offset, indexHandle.size);
   if (!indexBlock) {
-    console.log(`worldmap: failed to read index block at offset=${indexHandle.offset} size=${indexHandle.size}`);
+    // Try reading as raw uncompressed (Bedrock may store index blocks uncompressed differently)
+    console.log(`worldmap: readBlock failed, first bytes at offset: ${data.subarray(indexHandle.offset, indexHandle.offset + 16).toString("hex")}`);
     return;
   }
 
@@ -327,7 +340,10 @@ function readVarint(data: Buffer, pos: number): { value: bigint; newPos: number 
  * type: 0=uncompressed, 1=snappy, 2=zlib
  */
 function readBlock(data: Buffer, offset: number, size: number): Buffer | null {
-  if (offset + size + 5 > data.length) return null;
+  if (offset + size + 5 > data.length) {
+    // Bedrock may omit the 4-byte CRC, try with just 1 byte for compression type
+    if (offset + size + 1 > data.length) return null;
+  }
 
   const blockData = data.subarray(offset, offset + size);
   const compressionType = data[offset + size];
