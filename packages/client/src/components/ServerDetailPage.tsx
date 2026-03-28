@@ -279,7 +279,7 @@ function PlayerSection({
                 : "bg-gray-100 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500"
             }`}
           >
-            {isOp && <Shield size={11} className="text-yellow-500" title="Operator" />}
+            {isOp && <span title="Operator"><Shield size={11} className="text-yellow-500" /></span>}
             <span
               className={`inline-block w-1.5 h-1.5 rounded-full ${
                 online ? "bg-green-500" : "bg-gray-400 dark:bg-gray-600"
