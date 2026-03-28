@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import type { AddonSearchResult } from "../types/index.js";
 
 export default function AddonDetailPage() {
   const { source, id } = useParams<{ source: string; id: string }>();
+  const navigate = useNavigate();
   const [showInstall, setShowInstall] = useState(false);
   const [selectedScreenshot, setSelectedScreenshot] = useState<string | null>(null);
 
@@ -40,12 +41,12 @@ export default function AddonDetailPage() {
   if (error || !addon) {
     return (
       <div>
-        <Link
-          to="/"
+        <button
+          onClick={() => navigate(-1)}
           className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4"
         >
           <ArrowLeft size={16} /> Back to search
-        </Link>
+        </button>
         <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg p-4">
           <p className="text-red-600 dark:text-red-400">
             {error ? (error as Error).message : "Addon not found"}
@@ -71,12 +72,12 @@ export default function AddonDetailPage() {
 
   return (
     <div>
-      <Link
-        to="/"
+      <button
+        onClick={() => navigate(-1)}
         className="flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 mb-4"
       >
         <ArrowLeft size={16} /> Back to search
-      </Link>
+      </button>
 
       {/* Header */}
       <div className="card p-6 mb-6">
