@@ -244,10 +244,12 @@ function parseTableFile(data: Buffer, chunks: Map<string, ChunkInfo>): void {
   // Read footer (last 48 bytes)
   const footerStart = data.length - 48;
 
-  // Verify magic number
+  // Verify magic number — standard LevelDB or Bedrock's variant
   const magic = data.readBigUInt64LE(footerStart + 40);
-  if (magic !== 0x57fb808b24753568n) {
-    console.log(`worldmap: file magic mismatch: got 0x${magic.toString(16)}, expected 0x57fb808b24753568`);
+  const LEVELDB_MAGIC = 0x683575248b80fb57n;  // standard
+  const BEDROCK_MAGIC = 0xdb4775248b80fb57n;   // Mojang/Bedrock variant
+  if (magic !== LEVELDB_MAGIC && magic !== BEDROCK_MAGIC) {
+    console.log(`worldmap: file magic mismatch: got 0x${magic.toString(16)}`);
     return;
   }
 
