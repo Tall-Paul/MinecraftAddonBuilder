@@ -55,12 +55,13 @@ COPY --from=unmined-download /opt/unmined-cli /opt/unmined-cli
 # Copy env example
 COPY .env.example ./
 
-# Create data directory
-RUN mkdir -p /app/data/cache
+# Create data directories
+RUN mkdir -p /app/data/cache /app/data/backups
 
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV CACHE_DIR=/app/data/cache
+ENV BACKUP_DIR=/app/data/backups
 ENV DB_PATH=/app/data/addons.db
 ENV UNMINED_CLI=/opt/unmined-cli/unmined-cli
 

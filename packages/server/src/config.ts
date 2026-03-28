@@ -11,6 +11,7 @@ export const config = {
     .split(",")
     .map((s) => s.trim()),
   cacheDir: process.env.CACHE_DIR || path.resolve(process.cwd(), "data/cache"),
+  backupDir: process.env.BACKUP_DIR || path.resolve(process.cwd(), "data/backups"),
   dbPath: process.env.DB_PATH || path.resolve(process.cwd(), "data/addons.db"),
   clientDist: path.resolve(process.cwd(), "packages/client/dist"),
 };

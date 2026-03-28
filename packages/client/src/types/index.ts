@@ -87,3 +87,25 @@ export interface ServerDefaults {
   defaultMaxPlayers: number;
   defaultAllowCheats: boolean;
 }
+
+export interface Backup {
+  id: number;
+  container_id: string;
+  container_name: string;
+  server_name: string | null;
+  file_path: string;
+  file_size: number;
+  google_drive_id: string | null;
+  created_at: string;
+}
+
+export interface BackupSchedule {
+  enabled: boolean;
+  time: string;
+  containers: string[];
+}
+
+export interface GoogleDriveConfig {
+  configured: boolean;
+  folderId: string;
+}

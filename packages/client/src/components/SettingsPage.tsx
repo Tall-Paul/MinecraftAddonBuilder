@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Save, CheckCircle } from "lucide-react";
 import { getSettingsApi, updateSettingsApi, getDockerNetworks } from "../api/client.js";
+import BackupSettings from "./BackupSettings.js";
 import type { ServerDefaults } from "../types/index.js";
 
 export default function SettingsPage() {
@@ -306,6 +307,12 @@ export default function SettingsPage() {
           )}
         </div>
       </form>
+
+      {/* Backup Settings */}
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-6">Backups</h2>
+        <BackupSettings />
+      </div>
     </div>
   );
 }

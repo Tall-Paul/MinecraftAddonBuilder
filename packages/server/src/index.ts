@@ -9,6 +9,7 @@ import serverRoutes from "./routes/servers.js";
 import addonRoutes from "./routes/addons.js";
 import installRoutes from "./routes/install.js";
 import settingsRoutes from "./routes/settings.js";
+import backupRoutes from "./routes/backups.js";
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use("/api/servers", serverRoutes);
 app.use("/api/addons", addonRoutes);
 app.use("/api/install", installRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/backups", backupRoutes);
 
 // Health check
 app.get("/api/status", async (_req, res) => {
@@ -74,6 +76,11 @@ async function start() {
     preGenerateMaps().catch((err) =>
       console.error("Map pre-generation failed:", err)
     )
+  );
+
+  // Initialize backup schedule
+  import("./services/backup.js").then(({ initBackupSchedule }) =>
+    initBackupSchedule()
   );
 
   app.listen(config.port, () => {

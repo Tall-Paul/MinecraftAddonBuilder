@@ -56,5 +56,16 @@ function getInlineSchema(): string {
       cached_at TEXT NOT NULL DEFAULT (datetime('now')),
       UNIQUE(source, source_id)
     );
+    CREATE TABLE IF NOT EXISTS backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      container_id TEXT NOT NULL,
+      container_name TEXT NOT NULL,
+      server_name TEXT,
+      file_path TEXT NOT NULL,
+      file_size INTEGER NOT NULL DEFAULT 0,
+      google_drive_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_backups_container ON backups(container_id);
   `;
 }

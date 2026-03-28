@@ -7,6 +7,9 @@ import type {
   InstallResult,
   AppStatus,
   ServerDefaults,
+  Backup,
+  BackupSchedule,
+  GoogleDriveConfig,
 } from "../types/index.js";
 
 const API_BASE = "/api";
@@ -185,5 +188,45 @@ export async function updateSettingsApi(
   return apiFetch("/settings", {
     method: "PUT",
     body: JSON.stringify(settings),
+  });
+}
+
+// Backups
+export async function createBackupApi(containerId: string): Promise<{ backup: Backup }> {
+  return apiFetch(`/backups/${containerId}`, { method: "POST" });
+}
+
+export async function listBackupsApi(containerId?: string): Promise<{ backups: Backup[] }> {
+  const qs = containerId ? `?containerId=${containerId}` : "";
+  return apiFetch(`/backups${qs}`);
+}
+
+export async function deleteBackupApi(id: number): Promise<void> {
+  await apiFetch(`/backups/${id}`, { method: "DELETE" });
+}
+
+export function getBackupDownloadUrl(id: number): string {
+  return `${API_BASE}/backups/${id}/download`;
+}
+
+export async function getBackupScheduleApi(): Promise<BackupSchedule> {
+  return apiFetch("/backups/schedule");
+}
+
+export async function updateBackupScheduleApi(schedule: BackupSchedule): Promise<BackupSchedule> {
+  return apiFetch("/backups/schedule", {
+    method: "PUT",
+    body: JSON.stringify(schedule),
+  });
+}
+
+export async function getGoogleDriveConfigApi(): Promise<GoogleDriveConfig> {
+  return apiFetch("/backups/gdrive");
+}
+
+export async function updateGoogleDriveConfigApi(config: { credentialsPath: string; folderId: string }): Promise<GoogleDriveConfig> {
+  return apiFetch("/backups/gdrive", {
+    method: "PUT",
+    body: JSON.stringify(config),
   });
 }
