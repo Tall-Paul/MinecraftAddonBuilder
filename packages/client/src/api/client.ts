@@ -163,6 +163,10 @@ export interface MapMeta {
   zoomLevel: number;
   imageWidth: number;
   imageHeight: number;
+  blockMinX: number;
+  blockMinZ: number;
+  blockMaxX: number;
+  blockMaxZ: number;
 }
 
 export interface MapAreaParams {

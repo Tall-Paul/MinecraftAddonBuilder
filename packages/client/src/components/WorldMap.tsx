@@ -8,11 +8,6 @@ interface Props {
   serverStatus: string;
 }
 
-// At zoom Z, each pixel covers 2^(-Z) blocks.
-function blocksPerPixel(zoom: number): number {
-  return Math.pow(2, -zoom);
-}
-
 export default function WorldMap({ serverId, serverStatus }: Props) {
   const [mapUrl, setMapUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -43,11 +38,8 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     setLoading(true);
     setError(null);
     setZoomArea(null);
+    setMeta(null);
     setMapUrl(getWorldMapUrl(serverId, true));
-    // Re-fetch metadata after refresh
-    setTimeout(() => {
-      getWorldMapMeta(serverId).then(setMeta).catch(() => {});
-    }, 1000);
   }
 
   function handleBackToOverview() {
@@ -62,15 +54,12 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     (px: number, py: number) => {
       if (!meta || !imgRef.current) return null;
       const img = imgRef.current;
-      // The displayed image may be scaled; map to natural pixel coords
-      const natX = (px / img.clientWidth) * meta.imageWidth;
-      const natZ = (py / img.clientHeight) * meta.imageHeight;
-      const bpp = blocksPerPixel(meta.zoomLevel);
-      // Block coords relative to image top-left.
-      // The overview is trimmed, centered on the explored area.
-      // Approximate absolute coords assuming world centered on (0,0).
-      const blockX = (natX - meta.imageWidth / 2) * bpp;
-      const blockZ = (natZ - meta.imageHeight / 2) * bpp;
+      // Map displayed pixel position to fraction of image
+      const fracX = px / img.clientWidth;
+      const fracZ = py / img.clientHeight;
+      // Interpolate within the block-coordinate bounds from the metadata
+      const blockX = meta.blockMinX + fracX * (meta.blockMaxX - meta.blockMinX);
+      const blockZ = meta.blockMinZ + fracZ * (meta.blockMaxZ - meta.blockMinZ);
       return { blockX: Math.round(blockX), blockZ: Math.round(blockZ) };
     },
     [meta],
@@ -117,13 +106,26 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
 
     if (dragW < minDrag || dragH < minDrag) {
       // Click: zoom a 512x512 block area centered on click
-      const clickX = selStart.x;
-      const clickY = selStart.y;
-      const bpp = blocksPerPixel(meta.zoomLevel);
-      const viewBlocks = 512;
-      const viewPx = viewBlocks / bpp / 2;
-      topLeftPx = { x: clickX - viewPx, y: clickY - viewPx };
-      bottomRightPx = { x: clickX + viewPx, y: clickY + viewPx };
+      const center = pixelToBlocks(selStart.x, selStart.y);
+      if (!center) {
+        setSelStart(null);
+        setSelEnd(null);
+        return;
+      }
+      const area: MapAreaParams = {
+        blockX: center.blockX - 256,
+        blockZ: center.blockZ - 256,
+        blockW: 512,
+        blockH: 512,
+        zoom: 0,
+      };
+      setSelStart(null);
+      setSelEnd(null);
+      setZoomArea(area);
+      setLoading(true);
+      setError(null);
+      setMapUrl(getWorldMapUrl(serverId, false, area));
+      return;
     } else {
       topLeftPx = {
         x: Math.min(selStart.x, endX),
