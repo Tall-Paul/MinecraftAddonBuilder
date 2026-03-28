@@ -117,7 +117,7 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
         blockZ: center.blockZ - 256,
         blockW: 512,
         blockH: 512,
-        zoom: 0,
+        zoom: 2,
       };
       setSelStart(null);
       setSelEnd(null);
