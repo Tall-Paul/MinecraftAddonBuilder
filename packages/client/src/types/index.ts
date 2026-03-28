@@ -47,6 +47,7 @@ export interface ServerDetail extends BedrockServer {
   installedBehaviorPacks: Array<{ pack_id: string; version: number[] }>;
   installedResourcePacks: Array<{ pack_id: string; version: number[] }>;
   players?: string[];
+  operators?: Array<{ permission: string; xuid: string; name?: string }>;
 }
 
 export interface Installation {

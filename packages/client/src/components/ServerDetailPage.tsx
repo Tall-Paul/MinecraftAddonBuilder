@@ -1,9 +1,9 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Trash2, Package, RotateCw, Users } from "lucide-react";
+import { ArrowLeft, Trash2, Package, RotateCw, Users, Shield, ShieldOff } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerDetail } from "../hooks/useServers.js";
 import { useUninstallAddon } from "../hooks/useInstall.js";
-import { restartServer } from "../api/client.js";
+import { restartServer, opPlayerApi, deopPlayerApi } from "../api/client.js";
 import type { Installation } from "../types/index.js";
 
 export default function ServerDetailPage() {
@@ -14,6 +14,16 @@ export default function ServerDetailPage() {
   const restartMutation = useMutation({
     mutationFn: restartServer,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["servers"] }),
+  });
+  const opMutation = useMutation({
+    mutationFn: ({ serverId, playerName }: { serverId: string; playerName: string }) =>
+      opPlayerApi(serverId, playerName),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["servers", id] }),
+  });
+  const deopMutation = useMutation({
+    mutationFn: ({ serverId, playerName }: { serverId: string; playerName: string }) =>
+      deopPlayerApi(serverId, playerName),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["servers", id] }),
   });
 
   if (isLoading) {
@@ -131,14 +141,40 @@ export default function ServerDetailPage() {
               <Users size={12} /> Online Players
             </p>
             <div className="flex flex-wrap gap-2">
-              {server.players.map((name) => (
-                <span
-                  key={name}
-                  className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                >
-                  {name}
-                </span>
-              ))}
+              {server.players.map((name) => {
+                const isOp = server.operators?.some(
+                  (op) => op.name?.toLowerCase() === name.toLowerCase() || op.xuid === name
+                );
+
+                return (
+                  <div
+                    key={name}
+                    className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                  >
+                    {isOp && <Shield size={11} className="text-yellow-500" title="Operator" />}
+                    <span>{name}</span>
+                    {isOp ? (
+                      <button
+                        onClick={() => deopMutation.mutate({ serverId: server.containerId, playerName: name })}
+                        disabled={deopMutation.isPending}
+                        className="ml-1 p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 transition-colors"
+                        title="Remove operator"
+                      >
+                        <ShieldOff size={11} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => opMutation.mutate({ serverId: server.containerId, playerName: name })}
+                        disabled={opMutation.isPending}
+                        className="ml-1 p-0.5 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-500 dark:text-yellow-400 transition-colors"
+                        title="Make operator"
+                      >
+                        <Shield size={11} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

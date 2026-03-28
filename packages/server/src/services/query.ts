@@ -109,6 +109,43 @@ export async function getPlayerNames(container: Dockerode.Container): Promise<st
 }
 
 /**
+ * Send a console command to a Bedrock server container.
+ * Uses itzg's send-command helper.
+ */
+export async function sendCommand(container: Dockerode.Container, command: string): Promise<string | null> {
+  return execInContainer(container, ["send-command", command]);
+}
+
+/**
+ * Op a player on a Bedrock server.
+ */
+export async function opPlayer(container: Dockerode.Container, playerName: string): Promise<string | null> {
+  return sendCommand(container, `op ${playerName}`);
+}
+
+/**
+ * Deop a player on a Bedrock server.
+ */
+export async function deopPlayer(container: Dockerode.Container, playerName: string): Promise<string | null> {
+  return sendCommand(container, `deop ${playerName}`);
+}
+
+/**
+ * Read the permissions.json file from the server to get current operators.
+ * Returns list of player XUIDs and permissions, or reads from the op command output.
+ */
+export async function getOperators(container: Dockerode.Container, basePath: string): Promise<Array<{ permission: string; xuid: string; name?: string }>> {
+  const content = await execInContainer(container, ["cat", `${basePath}/permissions.json`]);
+  if (!content) return [];
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Get full server status: player count + player names.
  */
 export async function getServerStatus(

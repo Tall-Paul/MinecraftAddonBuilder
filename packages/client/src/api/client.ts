@@ -76,6 +76,20 @@ export async function deleteServerApi(id: string): Promise<void> {
   await apiFetch(`/servers/${id}`, { method: "DELETE" });
 }
 
+export async function opPlayerApi(serverId: string, playerName: string): Promise<{ message: string }> {
+  return apiFetch(`/servers/${serverId}/op`, {
+    method: "POST",
+    body: JSON.stringify({ playerName }),
+  });
+}
+
+export async function deopPlayerApi(serverId: string, playerName: string): Promise<{ message: string }> {
+  return apiFetch(`/servers/${serverId}/deop`, {
+    method: "POST",
+    body: JSON.stringify({ playerName }),
+  });
+}
+
 // Addons
 export async function searchAddons(
   query: string,

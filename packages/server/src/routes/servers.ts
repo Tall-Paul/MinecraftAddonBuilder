@@ -10,7 +10,8 @@ import {
   deleteServer,
 } from "../services/docker.js";
 import { getInstallations } from "../services/installer.js";
-import { getServerStatus } from "../services/query.js";
+import { getServerStatus, getOperators, opPlayer, deopPlayer } from "../services/query.js";
+import { detectBasePath } from "../services/docker.js";
 
 const router = Router();
 
@@ -74,6 +75,10 @@ router.get("/:id", async (req, res) => {
         detail.playerCount = status.playerCount;
         detail.maxPlayers = status.maxPlayers;
         detail.players = status.players;
+
+        // Get current operators
+        const basePath = await detectBasePath(container);
+        detail.operators = await getOperators(container, basePath);
       } catch (err) {
         console.error("Failed to query player info:", err);
       }
@@ -142,6 +147,40 @@ router.post("/:id/restart", async (req, res) => {
   try {
     await restartServer(req.params.id);
     res.json({ message: "Server restarted" });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/servers/:id/op — Make a player an operator
+router.post("/:id/op", async (req, res) => {
+  const { playerName } = req.body;
+  if (!playerName) {
+    return res.status(400).json({ error: "playerName is required" });
+  }
+
+  try {
+    const docker = getDockerInstance();
+    const container = docker.getContainer(req.params.id);
+    const result = await opPlayer(container, playerName);
+    res.json({ message: result || `Opped ${playerName}` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/servers/:id/deop — Remove operator status from a player
+router.post("/:id/deop", async (req, res) => {
+  const { playerName } = req.body;
+  if (!playerName) {
+    return res.status(400).json({ error: "playerName is required" });
+  }
+
+  try {
+    const docker = getDockerInstance();
+    const container = docker.getContainer(req.params.id);
+    const result = await deopPlayer(container, playerName);
+    res.json({ message: result || `De-opped ${playerName}` });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

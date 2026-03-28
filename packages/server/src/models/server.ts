@@ -23,4 +23,5 @@ export interface ServerDetail extends BedrockServer {
   playerCount?: number;
   maxPlayers?: number;
   players?: string[];
+  operators?: Array<{ permission: string; xuid: string; name?: string }>;
 }
