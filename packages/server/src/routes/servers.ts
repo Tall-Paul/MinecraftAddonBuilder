@@ -1,9 +1,12 @@
 import { Router } from "express";
+import path from "path";
+import multer from "multer";
 import {
   listBedrockServers,
   getServerDetail,
   getDockerInstance,
   createServer,
+  createServerFromWorld,
   startServer,
   stopServer,
   restartServer,
@@ -12,7 +15,9 @@ import {
 import { getInstallations } from "../services/installer.js";
 import { getServerStatus, getOperators, opPlayer, deopPlayer } from "../services/query.js";
 import { detectBasePath } from "../services/docker.js";
+import { config } from "../config.js";
 
+const upload = multer({ dest: path.join(config.cacheDir, "uploads") });
 const router = Router();
 
 // GET /api/servers — List detected Bedrock server containers
@@ -118,6 +123,44 @@ router.post("/", async (req, res) => {
     res.status(201).json({ server });
   } catch (err: any) {
     console.error("Failed to create server:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/servers/upload-world — Create a server from an .mcworld file
+router.post("/upload-world", upload.single("world"), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "No .mcworld file uploaded" });
+  }
+
+  const {
+    name,
+    serverName,
+    gameMode = "survival",
+    difficulty = "normal",
+    maxPlayers = "10",
+    allowCheats = "false",
+  } = req.body;
+
+  if (!name || !serverName) {
+    return res.status(400).json({ error: "name and serverName are required" });
+  }
+
+  try {
+    const server = await createServerFromWorld(
+      {
+        name,
+        serverName,
+        gameMode,
+        difficulty,
+        maxPlayers: parseInt(maxPlayers, 10) || 10,
+        allowCheats: allowCheats === "true",
+      },
+      req.file.path,
+    );
+    res.status(201).json({ server });
+  } catch (err: any) {
+    console.error("Failed to create server from world:", err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -63,6 +63,31 @@ export async function createServer(
   });
 }
 
+export async function uploadWorld(
+  params: CreateServerParams & { world: File },
+): Promise<{ server: BedrockServer }> {
+  const formData = new FormData();
+  formData.append("world", params.world);
+  formData.append("name", params.name);
+  formData.append("serverName", params.serverName);
+  formData.append("gameMode", params.gameMode);
+  formData.append("difficulty", params.difficulty);
+  formData.append("maxPlayers", String(params.maxPlayers));
+  formData.append("allowCheats", String(params.allowCheats));
+
+  const res = await fetch(`${API_BASE}/servers/upload-world`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(body.error || `Upload failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 export async function startServer(id: string): Promise<void> {
   await apiFetch(`/servers/${id}/start`, { method: "POST" });
 }

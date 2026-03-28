@@ -7,6 +7,7 @@ import {
   Pause,
   ChevronRight,
   Plus,
+  Upload,
   RotateCw,
   Trash2,
 } from "lucide-react";
@@ -19,10 +20,12 @@ import {
   deleteServerApi,
 } from "../api/client.js";
 import CreateServerModal from "./CreateServerModal.js";
+import UploadWorldModal from "./UploadWorldModal.js";
 
 export default function ServersPage() {
   const { data: servers, isLoading, error } = useServers();
   const [showCreate, setShowCreate] = useState(false);
+  const [showUpload, setShowUpload] = useState(false);
   const queryClient = useQueryClient();
 
   const startMutation = useMutation({
@@ -62,13 +65,22 @@ export default function ServersPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold">Bedrock Servers</h2>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="btn-primary text-sm"
-        >
-          <Plus size={16} className="inline mr-1" />
-          New Server
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowUpload(true)}
+            className="btn-secondary text-sm"
+          >
+            <Upload size={16} className="inline mr-1" />
+            Upload World
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="btn-primary text-sm"
+          >
+            <Plus size={16} className="inline mr-1" />
+            New Server
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -232,6 +244,10 @@ export default function ServersPage() {
 
       {showCreate && (
         <CreateServerModal onClose={() => setShowCreate(false)} />
+      )}
+
+      {showUpload && (
+        <UploadWorldModal onClose={() => setShowUpload(false)} />
       )}
     </div>
   );

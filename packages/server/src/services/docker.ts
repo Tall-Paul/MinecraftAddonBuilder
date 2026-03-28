@@ -1,4 +1,8 @@
 import Dockerode from "dockerode";
+import fs from "fs";
+import AdmZip from "adm-zip";
+import tar from "tar-stream";
+import { Writable } from "stream";
 import { config } from "../config.js";
 import type { BedrockServer, ServerDetail } from "../models/server.js";
 
@@ -371,3 +375,115 @@ export async function deleteServer(containerId: string): Promise<void> {
 export function getDockerInstance(): Dockerode {
   return getDocker();
 }
+
+/**
+ * Create a new server from an uploaded .mcworld file.
+ * 1. Create container via normal createServer flow
+ * 2. Wait for the itzg image to finish initial setup
+ * 3. Replace the default world with the uploaded one (while running)
+ * 4. Restart so the server picks up the new world
+ */
+export async function createServerFromWorld(
+  opts: CreateServerOptions,
+  mcworldPath: string,
+): Promise<BedrockServer> {
+  // 1. Create the server normally
+  const server = await createServer(opts);
+  const d = getDocker();
+  const container = d.getContainer(server.containerId);
+
+  try {
+    // 2. Wait for the itzg image to finish setup (server.properties must exist)
+    console.log(`uploadWorld: waiting for server init on ${server.containerName}...`);
+    await waitForServerReady(container, 120_000);
+
+    // 3. Detect paths while container is running
+    const basePath = await detectBasePath(container);
+    const levelName = await getLevelName(container, basePath);
+    const worldPath = `${basePath}/worlds/${levelName}`;
+
+    // 4. Remove the default world
+    console.log(`uploadWorld: removing default world at ${worldPath}`);
+    await execInContainer(container, ["rm", "-rf", worldPath]);
+
+    // 5. Upload the .mcworld contents as the new world
+    console.log(`uploadWorld: uploading .mcworld to ${basePath}/worlds/${levelName}`);
+    const tarBuffer = await mcworldToTar(mcworldPath, levelName);
+    await container.putArchive(tarBuffer, { path: `${basePath}/worlds` });
+
+    // 6. Restart so the Bedrock server loads the new world
+    console.log(`uploadWorld: restarting server with uploaded world`);
+    await container.restart();
+
+    return server;
+  } catch (err) {
+    // If something fails mid-way, try to clean up by removing the container
+    console.error("uploadWorld: failed, cleaning up container:", err);
+    try { await container.stop(); } catch { /* ignore */ }
+    try { await container.remove(); } catch { /* ignore */ }
+    throw err;
+  } finally {
+    // Clean up the uploaded file
+    try { fs.unlinkSync(mcworldPath); } catch { /* ignore */ }
+  }
+}
+
+/** Wait for the itzg server to finish initial setup by polling for server.properties. */
+async function waitForServerReady(container: Dockerode.Container, timeoutMs: number): Promise<void> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const props = await execInContainer(container, ["cat", "/data/server.properties"]);
+      if (props && props.includes("server-name")) {
+        return;
+      }
+    } catch { /* not ready yet */ }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error("Timed out waiting for server to initialize");
+}
+
+/** Get the level-name from server.properties */
+async function getLevelName(container: Dockerode.Container, basePath: string): Promise<string> {
+  const content = await execInContainer(container, ["cat", `${basePath}/server.properties`]);
+  const match = content?.match(/^level-name=(.+)$/m);
+  return match ? match[1].trim() : "Bedrock level";
+}
+
+/**
+ * Convert an .mcworld zip file to a tar buffer suitable for putArchive.
+ * The tar entries are prefixed with the level name directory.
+ */
+function mcworldToTar(mcworldPath: string, levelName: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const zip = new AdmZip(mcworldPath);
+    const pack = tar.pack();
+    const chunks: Buffer[] = [];
+
+    const collector = new Writable({
+      write(chunk, _encoding, callback) {
+        chunks.push(chunk);
+        callback();
+      },
+    });
+
+    collector.on("finish", () => resolve(Buffer.concat(chunks)));
+    collector.on("error", reject);
+
+    // Add the top-level directory entry
+    pack.entry({ name: levelName, type: "directory" });
+
+    for (const entry of zip.getEntries()) {
+      if (entry.isDirectory) {
+        pack.entry({ name: `${levelName}/${entry.entryName}`, type: "directory" });
+      } else {
+        const data = entry.getData();
+        pack.entry({ name: `${levelName}/${entry.entryName}`, size: data.length }, data);
+      }
+    }
+
+    pack.finalize();
+    pack.pipe(collector);
+  });
+}
+
