@@ -134,50 +134,8 @@ export default function ServerDetailPage() {
           />
         </div>
 
-        {/* Online Players */}
-        {server.players && server.players.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1">
-              <Users size={12} /> Online Players
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {server.players.map((name) => {
-                const isOp = server.operators?.some(
-                  (op) => op.name?.toLowerCase() === name.toLowerCase() || op.xuid === name
-                );
-
-                return (
-                  <div
-                    key={name}
-                    className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                  >
-                    {isOp && <Shield size={11} className="text-yellow-500" title="Operator" />}
-                    <span>{name}</span>
-                    {isOp ? (
-                      <button
-                        onClick={() => deopMutation.mutate({ serverId: server.containerId, playerName: name })}
-                        disabled={deopMutation.isPending}
-                        className="ml-1 p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 transition-colors"
-                        title="Remove operator"
-                      >
-                        <ShieldOff size={11} />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => opMutation.mutate({ serverId: server.containerId, playerName: name })}
-                        disabled={opMutation.isPending}
-                        className="ml-1 p-0.5 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-500 dark:text-yellow-400 transition-colors"
-                        title="Make operator"
-                      >
-                        <Shield size={11} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* Players — online + offline operators */}
+        <PlayerSection server={server} opMutation={opMutation} deopMutation={deopMutation} />
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <InfoItem
@@ -262,6 +220,97 @@ export default function ServerDetailPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function PlayerSection({
+  server,
+  opMutation,
+  deopMutation,
+}: {
+  server: import("../types/index.js").ServerDetail;
+  opMutation: any;
+  deopMutation: any;
+}) {
+  const onlinePlayers = server.players || [];
+  const operators = server.operators || [];
+
+  // Build unified player list: online players + offline operators
+  const onlineSet = new Set(onlinePlayers.map((n) => n.toLowerCase()));
+  const allPlayers: Array<{ name: string; online: boolean; isOp: boolean }> = [];
+
+  // Add online players
+  for (const name of onlinePlayers) {
+    const isOp = operators.some(
+      (op) => op.name?.toLowerCase() === name.toLowerCase() || op.xuid === name
+    );
+    allPlayers.push({ name, online: true, isOp });
+  }
+
+  // Add offline operators (ones not in the online list)
+  for (const op of operators) {
+    const opName = op.name || op.xuid;
+    if (opName && !onlineSet.has(opName.toLowerCase())) {
+      allPlayers.push({ name: opName, online: false, isOp: true });
+    }
+  }
+
+  if (allPlayers.length === 0) return null;
+
+  // Sort: online first, then alphabetically
+  allPlayers.sort((a, b) => {
+    if (a.online !== b.online) return a.online ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1">
+        <Users size={12} /> Players
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {allPlayers.map(({ name, online, isOp }) => (
+          <div
+            key={name}
+            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded-full ${
+              online
+                ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                : "bg-gray-100 dark:bg-gray-700/50 text-gray-400 dark:text-gray-500"
+            }`}
+          >
+            {isOp && <Shield size={11} className="text-yellow-500" title="Operator" />}
+            <span
+              className={`inline-block w-1.5 h-1.5 rounded-full ${
+                online ? "bg-green-500" : "bg-gray-400 dark:bg-gray-600"
+              }`}
+              title={online ? "Online" : "Offline"}
+            />
+            <span>{name}</span>
+            {online && (
+              isOp ? (
+                <button
+                  onClick={() => deopMutation.mutate({ serverId: server.containerId, playerName: name })}
+                  disabled={deopMutation.isPending}
+                  className="ml-1 p-0.5 rounded hover:bg-red-200 dark:hover:bg-red-900/50 text-red-500 dark:text-red-400 transition-colors"
+                  title="Remove operator"
+                >
+                  <ShieldOff size={11} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => opMutation.mutate({ serverId: server.containerId, playerName: name })}
+                  disabled={opMutation.isPending}
+                  className="ml-1 p-0.5 rounded hover:bg-yellow-200 dark:hover:bg-yellow-900/50 text-yellow-500 dark:text-yellow-400 transition-colors"
+                  title="Make operator"
+                >
+                  <Shield size={11} />
+                </button>
+              )
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
