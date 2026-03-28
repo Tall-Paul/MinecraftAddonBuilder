@@ -53,8 +53,10 @@ export async function generateWorldMap(
 
     console.log(`worldmap: running unmined-cli`);
 
-    // Try rendering, starting at zoom 0 and reducing if the world is too large
-    const zoomLevels = zoom !== "auto" ? [zoom] : ["0", "-1", "-2", "-3", "-4"];
+    // Try rendering, starting at zoom 0 and reducing if the world is too large.
+    // unmined crashes with various exceptions (Overflow, ArgumentException, etc.)
+    // when the output image exceeds limits, so retry at lower zoom on any SIGABRT/crash.
+    const zoomLevels = zoom !== "auto" ? [zoom] : ["0", "-1", "-2", "-3", "-4", "-5"];
     let lastError: Error | null = null;
 
     for (const zl of zoomLevels) {
@@ -82,13 +84,13 @@ export async function generateWorldMap(
         }
       } catch (err: any) {
         lastError = err;
-        const msg = String(err.stderr || err.message || "");
-        // Retry at lower zoom if overflow or image too large
-        if (msg.includes("OverflowException") || msg.includes("greater than 65535")) {
-          console.log(`worldmap: image too large at zoom ${zl}, trying lower zoom`);
-          continue;
+        // If unmined crashed (SIGABRT, non-zero exit), retry at lower zoom
+        // Only bail out on timeouts or Node-level spawn errors
+        if (err.killed || err.code === "ETIMEDOUT" || err.code === "ENOENT") {
+          throw err;
         }
-        throw err; // non-size-related error, don't retry
+        console.log(`worldmap: unmined crashed at zoom ${zl}, trying lower zoom`);
+        continue;
       }
     }
 
