@@ -124,7 +124,7 @@ router.post("/", async (req, res) => {
 
 // GET /api/servers/:id/map — Serve cached or generate a PNG map of the world
 router.get("/:id/map", async (req, res) => {
-  const scale = Math.min(Math.max(parseInt(req.query.scale as string) || 2, 1), 8);
+  const zoom = (req.query.zoom as string) || "auto";
   const refresh = req.query.refresh === "1";
 
   try {
@@ -132,7 +132,7 @@ router.get("/:id/map", async (req, res) => {
 
     // Serve cached map unless refresh requested
     if (!refresh) {
-      const cached = getCachedMap(req.params.id, scale);
+      const cached = getCachedMap(req.params.id, zoom);
       if (cached) {
         res.set("Content-Type", "image/png");
         res.set("Cache-Control", "public, max-age=300");
@@ -140,7 +140,7 @@ router.get("/:id/map", async (req, res) => {
       }
     }
 
-    const png = await generateWorldMap(req.params.id, scale);
+    const png = await generateWorldMap(req.params.id, zoom);
     res.set("Content-Type", "image/png");
     res.set("Cache-Control", "public, max-age=300");
     res.send(png);

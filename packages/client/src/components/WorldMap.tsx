@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Map, ZoomIn, ZoomOut, Loader2 } from "lucide-react";
+import { Map, Loader2, RefreshCw } from "lucide-react";
 import { getWorldMapUrl } from "../api/client.js";
 
 interface Props {
@@ -11,7 +11,6 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
   const [mapUrl, setMapUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [scale, setScale] = useState(2);
   const [initialized, setInitialized] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -20,23 +19,14 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     if (!initialized && serverStatus === "running") {
       setInitialized(true);
       setLoading(true);
-      setMapUrl(getWorldMapUrl(serverId, scale, false));
+      setMapUrl(getWorldMapUrl(serverId, false));
     }
-  }, [serverId, serverStatus, initialized, scale]);
+  }, [serverId, serverStatus, initialized]);
 
   function handleRefresh() {
     setLoading(true);
     setError(null);
-    setMapUrl(getWorldMapUrl(serverId, scale, true));
-  }
-
-  function handleZoom(newScale: number) {
-    setScale(newScale);
-    if (mapUrl) {
-      setLoading(true);
-      setError(null);
-      setMapUrl(getWorldMapUrl(serverId, newScale, true));
-    }
+    setMapUrl(getWorldMapUrl(serverId, true));
   }
 
   return (
@@ -46,45 +36,25 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
           <Map size={18} />
           World Map
         </h3>
-        <div className="flex items-center gap-2">
-          {mapUrl && (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleZoom(Math.max(1, scale - 1))}
-                disabled={scale <= 1 || loading}
-                className="btn-secondary text-xs py-1 px-2"
-                title="Zoom out"
-              >
-                <ZoomOut size={14} />
-              </button>
-              <span className="text-xs text-gray-500 dark:text-gray-400 w-8 text-center">{scale}x</span>
-              <button
-                onClick={() => handleZoom(Math.min(8, scale + 1))}
-                disabled={scale >= 8 || loading}
-                className="btn-secondary text-xs py-1 px-2"
-                title="Zoom in"
-              >
-                <ZoomIn size={14} />
-              </button>
-            </div>
-          )}
-          {serverStatus === "running" && (
-            <button
-              onClick={handleRefresh}
-              disabled={loading}
-              className="btn-primary text-xs py-1.5"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={14} className="inline mr-1 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                "Refresh"
-              )}
-            </button>
-          )}
-        </div>
+        {serverStatus === "running" && (
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="btn-primary text-xs py-1.5"
+          >
+            {loading ? (
+              <>
+                <Loader2 size={14} className="inline mr-1 animate-spin" />
+                {initialized ? "Generating..." : "Loading..."}
+              </>
+            ) : (
+              <>
+                <RefreshCw size={14} className="inline mr-1" />
+                Refresh
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {serverStatus !== "running" && !mapUrl && (
@@ -103,18 +73,16 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
         <div
           ref={containerRef}
           className="overflow-auto border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-900"
-          style={{ maxHeight: "500px" }}
+          style={{ maxHeight: "600px" }}
         >
           <img
             src={mapUrl}
             alt="World Map"
             className="max-w-none"
-            style={{ imageRendering: "pixelated" }}
             onLoad={() => setLoading(false)}
             onError={() => {
               setLoading(false);
               if (!initialized) {
-                // No cached map available, just show empty state
                 setMapUrl(null);
               } else {
                 setError("Failed to generate map. The world may not have been explored yet.");
