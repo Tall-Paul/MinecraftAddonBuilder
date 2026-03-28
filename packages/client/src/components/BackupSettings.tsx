@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, Cloud, Save, Loader2 } from "lucide-react";
+import { Clock, Cloud, Save, Loader2, Upload } from "lucide-react";
 import {
   getBackupScheduleApi,
   updateBackupScheduleApi,
   getGoogleDriveConfigApi,
-  updateGoogleDriveConfigApi,
+  uploadGoogleDriveCredentials,
   getServers,
 } from "../api/client.js";
 
@@ -44,8 +44,9 @@ export default function BackupSettings() {
     queryKey: ["gdrive-config"],
     queryFn: getGoogleDriveConfigApi,
   });
-  const [credPath, setCredPath] = useState("");
+  const [credFile, setCredFile] = useState<File | null>(null);
   const [folderId, setFolderId] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (gdrive) {
@@ -54,9 +55,12 @@ export default function BackupSettings() {
   }, [gdrive]);
 
   const gdriveMutation = useMutation({
-    mutationFn: () =>
-      updateGoogleDriveConfigApi({ credentialsPath: credPath, folderId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["gdrive-config"] }),
+    mutationFn: () => uploadGoogleDriveCredentials(credFile, folderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gdrive-config"] });
+      setCredFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    },
   });
 
   // Server list for reference
@@ -162,18 +166,33 @@ export default function BackupSettings() {
 
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-              Service Account Credentials File Path
+              Service Account Key File
             </label>
-            <input
-              type="text"
-              value={credPath}
-              onChange={(e) => setCredPath(e.target.value)}
-              placeholder="/app/data/google-credentials.json"
-              className="input text-sm py-1.5 px-3 w-full"
-            />
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="btn-secondary text-sm py-1.5"
+              >
+                <Upload size={14} className="inline mr-1" />
+                {credFile ? credFile.name : gdrive?.configured ? "Replace credentials" : "Upload JSON key"}
+              </button>
+              {credFile && (
+                <span className="text-xs text-green-600 dark:text-green-400">
+                  Ready to upload
+                </span>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => setCredFile(e.target.files?.[0] || null)}
+              />
+            </div>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Path to the Google service account JSON key file inside the container.
-              Mount it via Docker volume.
+              Upload a Google Cloud service account JSON key file.
+              Create one in the Google Cloud Console under IAM &gt; Service Accounts.
             </p>
           </div>
 
@@ -189,8 +208,8 @@ export default function BackupSettings() {
               className="input text-sm py-1.5 px-3 w-full"
             />
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              The ID of the Drive folder to upload backups to. Share this folder with
-              the service account email. Leave blank to use the service account's root.
+              The ID from the Drive folder URL. Share the folder with the service account email.
+              Leave blank to use the service account's root.
             </p>
           </div>
 

@@ -1,5 +1,8 @@
 import { Router } from "express";
 import path from "path";
+import fs from "fs";
+import multer from "multer";
+import { config } from "../config.js";
 import {
   createBackup,
   listBackups,
@@ -10,6 +13,8 @@ import {
   getGoogleDriveConfig,
   setGoogleDriveConfig,
 } from "../services/backup.js";
+
+const upload = multer({ dest: path.join(config.cacheDir, "uploads") });
 
 const router = Router();
 
@@ -45,11 +50,46 @@ router.get("/gdrive", async (_req, res) => {
   }
 });
 
-// PUT /api/backups/gdrive — Update Google Drive config
+// POST /api/backups/gdrive — Upload credentials file and update config
+router.post("/gdrive", upload.single("credentials"), async (req, res) => {
+  try {
+    const folderId = req.body.folderId || "";
+    let credentialsPath = "";
+
+    if (req.file) {
+      // Validate it's valid JSON with expected fields
+      const content = fs.readFileSync(req.file.path, "utf-8");
+      const parsed = JSON.parse(content);
+      if (!parsed.client_email || !parsed.private_key) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({ error: "Invalid service account key: missing client_email or private_key" });
+      }
+
+      // Move to data dir with a stable name
+      credentialsPath = path.join(path.dirname(config.dbPath), "google-credentials.json");
+      fs.mkdirSync(path.dirname(credentialsPath), { recursive: true });
+      fs.renameSync(req.file.path, credentialsPath);
+    }
+
+    setGoogleDriveConfig(credentialsPath, folderId);
+    res.json(getGoogleDriveConfig());
+  } catch (err: any) {
+    // Clean up uploaded file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/backups/gdrive — Update folder ID only
 router.put("/gdrive", async (req, res) => {
   try {
-    const { credentialsPath, folderId } = req.body;
-    setGoogleDriveConfig(credentialsPath || "", folderId || "");
+    const { folderId } = req.body;
+    // Get existing creds path so we don't overwrite it
+    const db = await import("../db/index.js");
+    const existing = (db.getDb().prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value || "";
+    setGoogleDriveConfig(existing, folderId || "");
     res.json(getGoogleDriveConfig());
   } catch (err: any) {
     res.status(500).json({ error: err.message });

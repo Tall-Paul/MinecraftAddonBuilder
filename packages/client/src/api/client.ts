@@ -224,9 +224,25 @@ export async function getGoogleDriveConfigApi(): Promise<GoogleDriveConfig> {
   return apiFetch("/backups/gdrive");
 }
 
-export async function updateGoogleDriveConfigApi(config: { credentialsPath: string; folderId: string }): Promise<GoogleDriveConfig> {
-  return apiFetch("/backups/gdrive", {
-    method: "PUT",
-    body: JSON.stringify(config),
-  });
+export async function uploadGoogleDriveCredentials(file: File | null, folderId: string): Promise<GoogleDriveConfig> {
+  if (file) {
+    const formData = new FormData();
+    formData.append("credentials", file);
+    formData.append("folderId", folderId);
+
+    const res = await fetch(`${API_BASE}/backups/gdrive`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({ error: res.statusText }));
+      throw new Error(body.error || `Upload failed: ${res.status}`);
+    }
+    return res.json();
+  } else {
+    return apiFetch("/backups/gdrive", {
+      method: "PUT",
+      body: JSON.stringify({ folderId }),
+    });
+  }
 }
