@@ -52,24 +52,48 @@ export async function generateWorldMap(
     await extractFromContainer(container, worldPath, worldDir);
 
     console.log(`worldmap: running unmined-cli`);
-    const args = [
-      "image", "render",
-      "--world", worldDir,
-      "--output", outputFile,
-      "--trim",
-    ];
-    if (zoom !== "auto") {
-      args.push("--zoomLevel", zoom);
+
+    // Try rendering, starting at zoom 0 and reducing if the world is too large
+    const zoomLevels = zoom !== "auto" ? [zoom] : ["0", "-1", "-2", "-3", "-4"];
+    let lastError: Error | null = null;
+
+    for (const zl of zoomLevels) {
+      try {
+        // Clean up previous attempt's output
+        if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+
+        const args = [
+          "image", "render",
+          "--world", worldDir,
+          "--output", outputFile,
+          "--trim",
+          "--zoomLevel", zl,
+        ];
+
+        console.log(`worldmap: trying zoom level ${zl}`);
+        const { stdout, stderr } = await execFileAsync(UNMINED_CLI, args, {
+          timeout: 180_000,
+        });
+        if (stdout) console.log(`worldmap: unmined stdout (last 500): ${stdout.trim().slice(-500)}`);
+        if (stderr) console.log(`worldmap: unmined stderr: ${stderr.trim()}`);
+
+        if (fs.existsSync(outputFile)) {
+          break; // success
+        }
+      } catch (err: any) {
+        lastError = err;
+        const msg = String(err.stderr || err.message || "");
+        // Retry at lower zoom if overflow or image too large
+        if (msg.includes("OverflowException") || msg.includes("greater than 65535")) {
+          console.log(`worldmap: image too large at zoom ${zl}, trying lower zoom`);
+          continue;
+        }
+        throw err; // non-size-related error, don't retry
+      }
     }
 
-    const { stdout, stderr } = await execFileAsync(UNMINED_CLI, args, {
-      timeout: 120_000,
-    });
-    if (stdout) console.log(`worldmap: unmined stdout: ${stdout.trim()}`);
-    if (stderr) console.log(`worldmap: unmined stderr: ${stderr.trim()}`);
-
     if (!fs.existsSync(outputFile)) {
-      throw new Error("unmined-cli did not produce output file");
+      throw lastError || new Error("unmined-cli did not produce output file");
     }
 
     const png = fs.readFileSync(outputFile);
