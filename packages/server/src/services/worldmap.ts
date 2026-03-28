@@ -4,7 +4,8 @@ import path from "path";
 import zlib from "zlib";
 import tar from "tar-stream";
 import { PNG } from "pngjs";
-import { getDockerInstance, getServerDetail, detectBasePath } from "./docker.js";
+import { getDockerInstance, getServerDetail, detectBasePath, listBedrockServers } from "./docker.js";
+import config from "../config.js";
 
 // Bedrock biome ID -> RGB color mapping
 const BIOME_COLORS: Record<number, [number, number, number]> = {
@@ -89,8 +90,24 @@ interface ChunkInfo {
   biome: number;
 }
 
+function getMapCachePath(containerId: string, scale: number): string {
+  return path.join(config.cacheDir, `map-${containerId}-${scale}x.png`);
+}
+
+/**
+ * Get a cached map if it exists.
+ */
+export function getCachedMap(containerId: string, scale: number): Buffer | null {
+  const cachePath = getMapCachePath(containerId, scale);
+  if (fs.existsSync(cachePath)) {
+    return fs.readFileSync(cachePath);
+  }
+  return null;
+}
+
 /**
  * Generate a PNG map of explored chunks with biome colors.
+ * Saves to cache after generation.
  */
 export async function generateWorldMap(
   containerId: string,
@@ -120,13 +137,39 @@ export async function generateWorldMap(
     }
 
     console.log(`worldmap: rendering PNG`);
-    return renderMap(chunks, scale);
+    const png = renderMap(chunks, scale);
+
+    // Save to cache
+    try {
+      fs.mkdirSync(config.cacheDir, { recursive: true });
+      fs.writeFileSync(getMapCachePath(containerId, scale), png);
+    } catch { /* best effort */ }
+
+    return png;
   } finally {
     try {
       if (fs.existsSync(tempDir)) {
         fs.rmSync(tempDir, { recursive: true, force: true });
       }
     } catch { /* best effort */ }
+  }
+}
+
+/**
+ * Pre-generate maps for all running servers (non-blocking).
+ */
+export async function preGenerateMaps(): Promise<void> {
+  const servers = await listBedrockServers();
+  const running = servers.filter((s) => s.status === "running");
+  console.log(`worldmap: pre-generating maps for ${running.length} running server(s)`);
+
+  for (const server of running) {
+    try {
+      await generateWorldMap(server.containerId, 2);
+      console.log(`worldmap: cached map for ${server.containerName}`);
+    } catch (err: any) {
+      console.log(`worldmap: skipping ${server.containerName}: ${err.message}`);
+    }
   }
 }
 

@@ -69,6 +69,13 @@ async function start() {
     )
   );
 
+  // Pre-generate world maps for running servers (non-blocking)
+  import("./services/worldmap.js").then(({ preGenerateMaps }) =>
+    preGenerateMaps().catch((err) =>
+      console.error("Map pre-generation failed:", err)
+    )
+  );
+
   app.listen(config.port, () => {
     console.log(`Minecraft Addon Builder running at http://localhost:${config.port}`);
     console.log(`Docker socket: ${config.dockerSocket}`);

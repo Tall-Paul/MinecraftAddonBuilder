@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Map, ZoomIn, ZoomOut, Loader2 } from "lucide-react";
 import { getWorldMapUrl } from "../api/client.js";
 
@@ -12,12 +12,22 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scale, setScale] = useState(2);
+  const [initialized, setInitialized] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  function handleGenerate() {
+  // Auto-load cached map on mount
+  useEffect(() => {
+    if (!initialized && serverStatus === "running") {
+      setInitialized(true);
+      setLoading(true);
+      setMapUrl(getWorldMapUrl(serverId, scale, false));
+    }
+  }, [serverId, serverStatus, initialized, scale]);
+
+  function handleRefresh() {
     setLoading(true);
     setError(null);
-    setMapUrl(getWorldMapUrl(serverId, scale));
+    setMapUrl(getWorldMapUrl(serverId, scale, true));
   }
 
   function handleZoom(newScale: number) {
@@ -25,7 +35,7 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     if (mapUrl) {
       setLoading(true);
       setError(null);
-      setMapUrl(getWorldMapUrl(serverId, newScale));
+      setMapUrl(getWorldMapUrl(serverId, newScale, true));
     }
   }
 
@@ -58,22 +68,22 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
               </button>
             </div>
           )}
-          <button
-            onClick={handleGenerate}
-            disabled={loading || serverStatus !== "running"}
-            className="btn-primary text-xs py-1.5"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={14} className="inline mr-1 animate-spin" />
-                Generating...
-              </>
-            ) : mapUrl ? (
-              "Refresh"
-            ) : (
-              "Generate Map"
-            )}
-          </button>
+          {serverStatus === "running" && (
+            <button
+              onClick={handleRefresh}
+              disabled={loading}
+              className="btn-primary text-xs py-1.5"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={14} className="inline mr-1 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                "Refresh"
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -103,21 +113,23 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
             onLoad={() => setLoading(false)}
             onError={() => {
               setLoading(false);
-              setError("Failed to generate map. The world may not have been explored yet.");
-              setMapUrl(null);
+              if (!initialized) {
+                // No cached map available, just show empty state
+                setMapUrl(null);
+              } else {
+                setError("Failed to generate map. The world may not have been explored yet.");
+                setMapUrl(null);
+              }
             }}
           />
         </div>
       )}
 
-      {!mapUrl && !error && serverStatus === "running" && (
+      {!mapUrl && !error && !loading && serverStatus === "running" && (
         <div className="text-center py-8">
           <Map className="mx-auto mb-3 text-gray-400 dark:text-gray-600" size={36} />
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Generate an overview map showing explored chunks and biomes
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            This may take a moment for large worlds
+            No cached map available yet — click Refresh to generate one
           </p>
         </div>
       )}

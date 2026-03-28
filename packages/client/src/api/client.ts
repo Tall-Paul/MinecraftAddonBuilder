@@ -156,8 +156,11 @@ export async function uninstallAddon(
 }
 
 // World Map
-export function getWorldMapUrl(serverId: string, scale: number = 2): string {
-  return `${API_BASE}/servers/${serverId}/map?scale=${scale}&t=${Date.now()}`;
+export function getWorldMapUrl(serverId: string, scale: number = 2, refresh: boolean = false): string {
+  const params = new URLSearchParams({ scale: String(scale) });
+  if (refresh) params.set("refresh", "1");
+  params.set("t", String(Date.now()));
+  return `${API_BASE}/servers/${serverId}/map?${params}`;
 }
 
 // Settings

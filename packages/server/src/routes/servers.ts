@@ -122,15 +122,27 @@ router.post("/", async (req, res) => {
   }
 });
 
-// GET /api/servers/:id/map — Generate a PNG map of the world
+// GET /api/servers/:id/map — Serve cached or generate a PNG map of the world
 router.get("/:id/map", async (req, res) => {
   const scale = Math.min(Math.max(parseInt(req.query.scale as string) || 2, 1), 8);
+  const refresh = req.query.refresh === "1";
 
   try {
-    const { generateWorldMap } = await import("../services/worldmap.js");
+    const { getCachedMap, generateWorldMap } = await import("../services/worldmap.js");
+
+    // Serve cached map unless refresh requested
+    if (!refresh) {
+      const cached = getCachedMap(req.params.id, scale);
+      if (cached) {
+        res.set("Content-Type", "image/png");
+        res.set("Cache-Control", "public, max-age=300");
+        return res.send(cached);
+      }
+    }
+
     const png = await generateWorldMap(req.params.id, scale);
     res.set("Content-Type", "image/png");
-    res.set("Cache-Control", "no-cache");
+    res.set("Cache-Control", "public, max-age=300");
     res.send(png);
   } catch (err: any) {
     console.error("Failed to generate world map:", err);
