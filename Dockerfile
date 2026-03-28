@@ -22,19 +22,22 @@ RUN npm run build -w packages/server
 
 # Stage 3: Download unmined-cli
 FROM alpine:3.20 AS unmined-download
-RUN apk add --no-cache curl
-RUN curl -L -o /tmp/unmined-cli.gz "https://unmined.net/download/unmined-cli-linux-musl-x64-dev/" \
-    && mkdir -p /opt/unmined-cli \
-    && gunzip /tmp/unmined-cli.gz \
-    && mv /tmp/unmined-cli /opt/unmined-cli/unmined-cli \
-    && chmod +x /opt/unmined-cli/unmined-cli
+RUN apk add --no-cache curl tar
+RUN mkdir -p /opt/unmined-cli \
+    && curl -L -o /tmp/unmined-cli-download "https://unmined.net/download/unmined-cli-linux-musl-x64-dev/" \
+    && cd /opt/unmined-cli \
+    && (tar xzf /tmp/unmined-cli-download 2>/dev/null \
+        || gunzip -c /tmp/unmined-cli-download > unmined-cli 2>/dev/null \
+        || cp /tmp/unmined-cli-download unmined-cli) \
+    && chmod +x /opt/unmined-cli/* \
+    && ls -la /opt/unmined-cli/
 
 # Stage 4: Production image
 FROM node:20-alpine
 WORKDIR /app
 
-# Install libs needed by unmined-cli (.NET self-contained may need icu/libstdc++)
-RUN apk add --no-cache libstdc++ icu-libs
+# Install libs needed by unmined-cli (.NET self-contained needs icu/libstdc++/libintl)
+RUN apk add --no-cache libstdc++ icu-libs libgcc
 
 # Install production dependencies only
 COPY package.json package-lock.json* ./
