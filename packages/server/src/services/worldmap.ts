@@ -67,7 +67,7 @@ export async function generateWorldMap(
           "--world", worldDir,
           "--output", outputFile,
           "--trim",
-          "--zoomLevel", zl,
+          "--zoom", zl,
         ];
 
         console.log(`worldmap: trying zoom level ${zl}`);
