@@ -11,7 +11,6 @@ RUN npm run build -w packages/client
 
 # Stage 2: Build server
 FROM node:20-alpine AS server-build
-RUN apk add --no-cache python3 make g++
 WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY packages/server/package.json packages/server/
@@ -23,14 +22,13 @@ RUN npm run build -w packages/server
 
 # Stage 3: Production image
 FROM node:20-alpine
-RUN apk add --no-cache python3 make g++
 WORKDIR /app
 
 # Install production dependencies only
 COPY package.json package-lock.json* ./
 COPY packages/server/package.json packages/server/
 COPY packages/client/package.json packages/client/
-RUN npm install --omit=dev && apk del python3 make g++
+RUN npm install --omit=dev
 
 # Copy built server
 COPY --from=server-build /app/packages/server/dist packages/server/dist/
