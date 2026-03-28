@@ -11,8 +11,25 @@ const execFileAsync = promisify(execFile);
 
 const UNMINED_CLI = process.env.UNMINED_CLI || "/opt/unmined-cli/unmined-cli";
 
+export interface MapMeta {
+  zoomLevel: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
 function getMapCachePath(containerId: string, zoom: string): string {
   return path.join(config.cacheDir, `map-${containerId}-z${zoom}.png`);
+}
+
+function getMapMetaPath(containerId: string, zoom: string): string {
+  return path.join(config.cacheDir, `map-${containerId}-z${zoom}.json`);
+}
+
+/** Read PNG width/height from the IHDR chunk (bytes 16-23). */
+function readPngDimensions(buf: Buffer): { width: number; height: number } {
+  const width = buf.readUInt32BE(16);
+  const height = buf.readUInt32BE(20);
+  return { width, height };
 }
 
 /**
@@ -22,6 +39,19 @@ export function getCachedMap(containerId: string, zoom: string): Buffer | null {
   const cachePath = getMapCachePath(containerId, zoom);
   if (fs.existsSync(cachePath)) {
     return fs.readFileSync(cachePath);
+  }
+  return null;
+}
+
+/**
+ * Get the metadata (zoom level, image dimensions) for a cached overview map.
+ */
+export function getCachedMapMeta(containerId: string, zoom: string = "auto"): MapMeta | null {
+  const metaPath = getMapMetaPath(containerId, zoom);
+  if (fs.existsSync(metaPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(metaPath, "utf-8"));
+    } catch { return null; }
   }
   return null;
 }
@@ -58,6 +88,7 @@ export async function generateWorldMap(
     // when the output image exceeds limits, so retry at lower zoom on any SIGABRT/crash.
     const zoomLevels = zoom !== "auto" ? [zoom] : ["0", "-1", "-2", "-3", "-4", "-5"];
     let lastError: Error | null = null;
+    let usedZoom = zoomLevels[0];
 
     for (const zl of zoomLevels) {
       try {
@@ -80,6 +111,7 @@ export async function generateWorldMap(
         if (stderr) console.log(`worldmap: unmined stderr: ${stderr.trim()}`);
 
         if (fs.existsSync(outputFile)) {
+          usedZoom = zl;
           break; // success
         }
       } catch (err: any) {
@@ -99,12 +131,20 @@ export async function generateWorldMap(
     }
 
     const png = fs.readFileSync(outputFile);
-    console.log(`worldmap: generated ${(png.length / 1024).toFixed(0)}KB map`);
+    console.log(`worldmap: generated ${(png.length / 1024).toFixed(0)}KB map at zoom ${usedZoom}`);
 
-    // Save to cache
+    // Save PNG and metadata sidecar to cache
     try {
       fs.mkdirSync(config.cacheDir, { recursive: true });
       fs.writeFileSync(getMapCachePath(containerId, zoom), png);
+
+      const dims = readPngDimensions(png);
+      const meta: MapMeta = {
+        zoomLevel: parseInt(usedZoom, 10),
+        imageWidth: dims.width,
+        imageHeight: dims.height,
+      };
+      fs.writeFileSync(getMapMetaPath(containerId, zoom), JSON.stringify(meta));
     } catch { /* best effort */ }
 
     return png;
@@ -132,6 +172,67 @@ export async function preGenerateMaps(): Promise<void> {
     } catch (err: any) {
       console.log(`worldmap: skipping ${server.containerName}: ${err.message}`);
     }
+  }
+}
+
+/**
+ * Generate a zoomed-in PNG map of a specific block area.
+ * Does not cache — these are on-demand renders.
+ */
+export async function generateZoomedMap(
+  containerId: string,
+  blockX: number,
+  blockZ: number,
+  blockW: number,
+  blockH: number,
+  zoom: string = "0"
+): Promise<Buffer> {
+  const server = await getServerDetail(containerId);
+  if (!server) throw new Error("Server not found");
+
+  const docker = getDockerInstance();
+  const container = docker.getContainer(containerId);
+  const basePath = await detectBasePath(container);
+  const levelName = server.levelName || "Bedrock level";
+  const worldPath = `${basePath}/worlds/${levelName}`;
+
+  const tempDir = path.join(os.tmpdir(), `mcmap-zoom-${containerId}-${Date.now()}`);
+  const worldDir = path.join(tempDir, "world");
+  const outputFile = path.join(tempDir, "map.png");
+
+  try {
+    console.log(`worldmap: extracting world for zoomed render`);
+    await extractFromContainer(container, worldPath, worldDir);
+
+    const areaArg = `b(${blockX},${blockZ},${blockW},${blockH})`;
+    const args = [
+      "image", "render",
+      "--world", worldDir,
+      "--output", outputFile,
+      "--zoom", zoom,
+      "--area", areaArg,
+    ];
+
+    console.log(`worldmap: zoomed render area=${areaArg} zoom=${zoom}`);
+    const { stdout, stderr } = await execFileAsync(UNMINED_CLI, args, {
+      timeout: 180_000,
+    });
+    if (stdout) console.log(`worldmap: unmined stdout (last 500): ${stdout.trim().slice(-500)}`);
+    if (stderr) console.log(`worldmap: unmined stderr: ${stderr.trim()}`);
+
+    if (!fs.existsSync(outputFile)) {
+      throw new Error("unmined-cli did not produce output file for zoomed render");
+    }
+
+    const png = fs.readFileSync(outputFile);
+    console.log(`worldmap: zoomed render ${(png.length / 1024).toFixed(0)}KB`);
+    return png;
+  } finally {
+    try {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    } catch { /* best effort */ }
   }
 }
 

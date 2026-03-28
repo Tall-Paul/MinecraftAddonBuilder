@@ -122,12 +122,47 @@ router.post("/", async (req, res) => {
   }
 });
 
+// GET /api/servers/:id/map/meta — Get metadata for the cached overview map
+router.get("/:id/map/meta", async (req, res) => {
+  try {
+    const { getCachedMapMeta } = await import("../services/worldmap.js");
+    const zoom = (req.query.zoom as string) || "auto";
+    const meta = getCachedMapMeta(req.params.id, zoom);
+    if (!meta) {
+      return res.status(404).json({ error: "No cached map metadata" });
+    }
+    res.json(meta);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/servers/:id/map — Serve cached or generate a PNG map of the world
 router.get("/:id/map", async (req, res) => {
   const zoom = (req.query.zoom as string) || "auto";
   const refresh = req.query.refresh === "1";
+  const blockX = req.query.blockX as string | undefined;
+  const blockZ = req.query.blockZ as string | undefined;
+  const blockW = req.query.blockW as string | undefined;
+  const blockH = req.query.blockH as string | undefined;
 
   try {
+    // Area-based zoomed render
+    if (blockX && blockZ && blockW && blockH) {
+      const { generateZoomedMap } = await import("../services/worldmap.js");
+      const png = await generateZoomedMap(
+        req.params.id,
+        parseInt(blockX, 10),
+        parseInt(blockZ, 10),
+        parseInt(blockW, 10),
+        parseInt(blockH, 10),
+        zoom,
+      );
+      res.set("Content-Type", "image/png");
+      res.set("Cache-Control", "public, max-age=60");
+      return res.send(png);
+    }
+
     const { getCachedMap, generateWorldMap } = await import("../services/worldmap.js");
 
     // Serve cached map unless refresh requested

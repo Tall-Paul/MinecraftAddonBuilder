@@ -159,11 +159,40 @@ export async function uninstallAddon(
 }
 
 // World Map
-export function getWorldMapUrl(serverId: string, refresh: boolean = false): string {
+export interface MapMeta {
+  zoomLevel: number;
+  imageWidth: number;
+  imageHeight: number;
+}
+
+export interface MapAreaParams {
+  blockX: number;
+  blockZ: number;
+  blockW: number;
+  blockH: number;
+  zoom: number;
+}
+
+export function getWorldMapUrl(
+  serverId: string,
+  refresh: boolean = false,
+  area?: MapAreaParams,
+): string {
   const params = new URLSearchParams();
   if (refresh) params.set("refresh", "1");
+  if (area) {
+    params.set("blockX", String(area.blockX));
+    params.set("blockZ", String(area.blockZ));
+    params.set("blockW", String(area.blockW));
+    params.set("blockH", String(area.blockH));
+    params.set("zoom", String(area.zoom));
+  }
   params.set("t", String(Date.now()));
   return `${API_BASE}/servers/${serverId}/map?${params}`;
+}
+
+export async function getWorldMapMeta(serverId: string): Promise<MapMeta> {
+  return apiFetch(`/servers/${serverId}/map/meta`);
 }
 
 // Settings
