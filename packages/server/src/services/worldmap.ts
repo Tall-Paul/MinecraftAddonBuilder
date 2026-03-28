@@ -2,6 +2,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import zlib from "zlib";
+import * as fzstd from "fzstd";
 import tar from "tar-stream";
 import { PNG } from "pngjs";
 import { getDockerInstance, getServerDetail, detectBasePath } from "./docker.js";
@@ -337,7 +338,7 @@ function readVarint(data: Buffer, pos: number): { value: bigint; newPos: number 
 /**
  * Read and decompress a data block from the table file.
  * Block format: [data][type:1byte][crc:4bytes]
- * type: 0=uncompressed, 1=snappy, 2=zlib
+ * type: 0=uncompressed, 1=snappy, 2=zlib, 4=zstd
  */
 function readBlock(data: Buffer, offset: number, size: number): Buffer | null {
   if (offset + size + 5 > data.length) {
@@ -349,10 +350,9 @@ function readBlock(data: Buffer, offset: number, size: number): Buffer | null {
   const compressionType = data[offset + size];
 
   if (compressionType === 0) {
-    // Uncompressed
-    return blockData;
+    return Buffer.from(blockData);
   } else if (compressionType === 2) {
-    // Zlib (Bedrock uses this)
+    // Zlib
     try {
       return zlib.inflateRawSync(blockData);
     } catch {
@@ -362,8 +362,16 @@ function readBlock(data: Buffer, offset: number, size: number): Buffer | null {
         return null;
       }
     }
+  } else if (compressionType === 4) {
+    // Zstd (newer Bedrock versions)
+    try {
+      const decompressed = fzstd.decompress(new Uint8Array(blockData));
+      return Buffer.from(decompressed);
+    } catch {
+      return null;
+    }
   } else if (compressionType === 1) {
-    // Snappy — not typically used by Bedrock, skip
+    // Snappy
     return null;
   }
 
