@@ -5,7 +5,7 @@ import zlib from "zlib";
 import tar from "tar-stream";
 import { PNG } from "pngjs";
 import { getDockerInstance, getServerDetail, detectBasePath, listBedrockServers } from "./docker.js";
-import config from "../config.js";
+import { config } from "../config.js";
 
 // Bedrock biome ID -> RGB color mapping
 const BIOME_COLORS: Record<number, [number, number, number]> = {
