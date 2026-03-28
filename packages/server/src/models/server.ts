@@ -20,4 +20,7 @@ export interface BedrockServer {
 export interface ServerDetail extends BedrockServer {
   installedBehaviorPacks: Array<{ pack_id: string; version: number[] }>;
   installedResourcePacks: Array<{ pack_id: string; version: number[] }>;
+  playerCount?: number;
+  maxPlayers?: number;
+  players?: string[];
 }

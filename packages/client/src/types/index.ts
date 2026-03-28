@@ -39,11 +39,14 @@ export interface BedrockServer {
   gameMode?: string;
   dataMount?: string;
   ipAddress?: string;
+  playerCount?: number;
+  maxPlayers?: number;
 }
 
 export interface ServerDetail extends BedrockServer {
   installedBehaviorPacks: Array<{ pack_id: string; version: number[] }>;
   installedResourcePacks: Array<{ pack_id: string; version: number[] }>;
+  players?: string[];
 }
 
 export interface Installation {

@@ -153,6 +153,12 @@ export default function ServersPage() {
                       <span>{server.ipAddress}</span>
                     </>
                   ) : null}
+                  {server.status === "running" && server.playerCount !== undefined && (
+                    <>
+                      <span>|</span>
+                      <span>{server.playerCount}/{server.maxPlayers} players</span>
+                    </>
+                  )}
                 </div>
               </Link>
 

@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, Trash2, Package, RotateCw } from "lucide-react";
+import { ArrowLeft, Trash2, Package, RotateCw, Users } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerDetail } from "../hooks/useServers.js";
 import { useUninstallAddon } from "../hooks/useInstall.js";
@@ -114,6 +114,36 @@ export default function ServerDetailPage() {
                 : server.ipAddress || "—"
             }
           />
+          <InfoItem
+            label="Players"
+            value={
+              server.playerCount !== undefined
+                ? `${server.playerCount} / ${server.maxPlayers}`
+                : "—"
+            }
+          />
+        </div>
+
+        {/* Online Players */}
+        {server.players && server.players.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 flex items-center gap-1">
+              <Users size={12} /> Online Players
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {server.players.map((name) => (
+                <span
+                  key={name}
+                  className="text-xs px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
           <InfoItem
             label="Registered Packs"
             value={`${server.installedBehaviorPacks.length} BP / ${server.installedResourcePacks.length} RP`}

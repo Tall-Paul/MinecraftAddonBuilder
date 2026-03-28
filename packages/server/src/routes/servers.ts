@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   listBedrockServers,
   getServerDetail,
+  getDockerInstance,
   createServer,
   startServer,
   stopServer,
@@ -9,6 +10,7 @@ import {
   deleteServer,
 } from "../services/docker.js";
 import { getInstallations } from "../services/installer.js";
+import { getServerStatus } from "../services/query.js";
 
 const router = Router();
 
@@ -16,7 +18,27 @@ const router = Router();
 router.get("/", async (_req, res) => {
   try {
     const servers = await listBedrockServers();
-    res.json({ servers });
+
+    // Query player counts in parallel for running servers
+    const serversWithPlayers = await Promise.all(
+      servers.map(async (server) => {
+        if (server.status !== "running") return server;
+        try {
+          const queryHost = server.ipAddress || "127.0.0.1";
+          const queryPort = server.ipAddress
+            ? 19132
+            : server.ports.find((p) => p.containerPort === 19132)?.hostPort || 19132;
+
+          const { queryBedrockServer } = await import("../services/query.js");
+          const status = await queryBedrockServer(queryHost, queryPort, 2000);
+          return { ...server, playerCount: status.playerCount, maxPlayers: status.maxPlayers };
+        } catch {
+          return server;
+        }
+      })
+    );
+
+    res.json({ servers: serversWithPlayers });
   } catch (err: any) {
     console.error("Failed to list servers:", err);
     res.status(500).json({
@@ -35,6 +57,27 @@ router.get("/:id", async (req, res) => {
     }
 
     const installations = getInstallations(req.params.id);
+
+    // Query player info for running servers
+    if (detail.status === "running") {
+      try {
+        // Determine query address: use IP if available, otherwise localhost via port mapping
+        const queryHost = detail.ipAddress || "127.0.0.1";
+        const queryPort = detail.ipAddress
+          ? 19132
+          : detail.ports.find((p) => p.containerPort === 19132)?.hostPort || 19132;
+
+        const docker = getDockerInstance();
+        const container = docker.getContainer(detail.containerId);
+        const status = await getServerStatus(container, queryHost, queryPort);
+
+        detail.playerCount = status.playerCount;
+        detail.maxPlayers = status.maxPlayers;
+        detail.players = status.players;
+      } catch (err) {
+        console.error("Failed to query player info:", err);
+      }
+    }
 
     res.json({ server: detail, installations });
   } catch (err: any) {
