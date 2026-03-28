@@ -190,17 +190,24 @@ async function extractFromContainer(
 async function parseLDBFiles(dbDir: string): Promise<ChunkInfo[]> {
   const chunks = new Map<string, ChunkInfo>();
 
-  const files = fs.readdirSync(dbDir).filter(
+  const allFiles = fs.readdirSync(dbDir);
+  console.log(`worldmap: db directory contains ${allFiles.length} files: ${allFiles.slice(0, 20).join(", ")}${allFiles.length > 20 ? "..." : ""}`);
+
+  const files = allFiles.filter(
     (f) => f.endsWith(".ldb") || f.endsWith(".sst")
   );
+  console.log(`worldmap: found ${files.length} table files (.ldb/.sst)`);
 
   for (const file of files) {
     try {
       const filePath = path.join(dbDir, file);
       const data = fs.readFileSync(filePath);
+      const before = chunks.size;
       parseTableFile(data, chunks);
+      if (chunks.size > before) {
+        console.log(`worldmap: ${file} (${data.length} bytes) yielded ${chunks.size - before} new chunks`);
+      }
     } catch (err) {
-      // Skip corrupt/unreadable files
       console.warn(`worldmap: skipping ${file}: ${err}`);
     }
   }
@@ -210,12 +217,18 @@ async function parseLDBFiles(dbDir: string): Promise<ChunkInfo[]> {
     const logFile = path.join(dbDir, "CURRENT");
     if (fs.existsSync(logFile)) {
       const currentLog = fs.readFileSync(logFile, "utf-8").trim();
+      console.log(`worldmap: CURRENT points to "${currentLog}"`);
       const walPath = path.join(dbDir, currentLog);
       if (fs.existsSync(walPath)) {
-        parseLogFile(fs.readFileSync(walPath), chunks);
+        const walData = fs.readFileSync(walPath);
+        console.log(`worldmap: WAL file ${currentLog} is ${walData.length} bytes`);
+        const before = chunks.size;
+        parseLogFile(walData, chunks);
+        console.log(`worldmap: WAL yielded ${chunks.size - before} new chunks`);
       }
     }
-  } catch {
+  } catch (err) {
+    console.warn(`worldmap: WAL parsing error: ${err}`);
     // WAL parsing is best-effort
   }
 
@@ -233,7 +246,10 @@ function parseTableFile(data: Buffer, chunks: Map<string, ChunkInfo>): void {
 
   // Verify magic number
   const magic = data.readBigUInt64LE(footerStart + 40);
-  if (magic !== 0x57fb808b24753568n) return;
+  if (magic !== 0x57fb808b24753568n) {
+    console.log(`worldmap: file magic mismatch: got 0x${magic.toString(16)}, expected 0x57fb808b24753568`);
+    return;
+  }
 
   // Read index block handle from footer
   let pos = footerStart;
@@ -243,21 +259,35 @@ function parseTableFile(data: Buffer, chunks: Map<string, ChunkInfo>): void {
 
   // Read and decompress the index block
   const indexBlock = readBlock(data, indexHandle.offset, indexHandle.size);
-  if (!indexBlock) return;
+  if (!indexBlock) {
+    console.log(`worldmap: failed to read index block at offset=${indexHandle.offset} size=${indexHandle.size}`);
+    return;
+  }
 
   // Parse index block to find data block locations
   const dataBlockHandles = parseIndexBlock(indexBlock);
+  console.log(`worldmap: index block has ${dataBlockHandles.length} data block references`);
+
+  let blocksRead = 0;
+  let blocksFailed = 0;
 
   // Read each data block and extract chunk keys
   for (const handle of dataBlockHandles) {
     try {
       const block = readBlock(data, handle.offset, handle.size);
       if (block) {
+        blocksRead++;
         parseDataBlock(block, chunks);
+      } else {
+        blocksFailed++;
       }
     } catch {
-      // Skip corrupt blocks
+      blocksFailed++;
     }
+  }
+
+  if (blocksFailed > 0 || blocksRead > 0) {
+    console.log(`worldmap: read ${blocksRead} data blocks, ${blocksFailed} failed`);
   }
 }
 
