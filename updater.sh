@@ -23,15 +23,12 @@ if [ -n "$GIT_TOKEN" ]; then
   fi
 fi
 
-# Detect the compose project name from the running addon-manager container's labels
-PROJECT_NAME=$(docker inspect mc-addon-manager --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "")
-if [ -z "$PROJECT_NAME" ]; then
-  echo "updater: WARNING — could not detect project name, falling back to 'minecraftaddonbuilder'"
-  PROJECT_NAME="minecraftaddonbuilder"
-fi
+# Capture the current container's config so we can recreate it
+# (volumes, ports, env, restart policy are all defined here)
+IMAGE_NAME="repo-addon-manager"
+CONTAINER_NAME="mc-addon-manager"
 
-COMPOSE="docker compose -p $PROJECT_NAME -f /repo/docker-compose.yml"
-echo "updater: watching branch '$BRANCH' every ${INTERVAL}s (project=$PROJECT_NAME)"
+echo "updater: watching branch '$BRANCH' every ${INTERVAL}s"
 
 while true; do
   sleep "$INTERVAL"
@@ -58,13 +55,18 @@ while true; do
     continue
   fi
 
-  echo "updater: rebuilding and restarting app..."
-
-  # Rebuild only the app service and recreate it
-  # --no-deps avoids restarting the updater itself
+  echo "updater: rebuilding app image..."
   COMMIT=$(git rev-parse --short HEAD)
-  $COMPOSE build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
-  $COMPOSE up -d --no-deps addon-manager 2>&1
 
-  echo "updater: done, app restarted with $(git rev-parse --short HEAD)"
+  # Build the new image using docker compose (for build context/args)
+  docker compose -f /repo/docker-compose.yml --env-file /dev/null build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
+
+  echo "updater: stopping old container..."
+  docker stop "$CONTAINER_NAME" 2>&1 || true
+  docker rm "$CONTAINER_NAME" 2>&1 || true
+
+  echo "updater: starting new container..."
+  docker compose -f /repo/docker-compose.yml --env-file /dev/null up -d --no-deps addon-manager 2>&1
+
+  echo "updater: done, app restarted with $COMMIT"
 done
