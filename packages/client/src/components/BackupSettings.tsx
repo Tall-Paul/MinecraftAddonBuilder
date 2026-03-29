@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, Cloud, Save, Loader2, Upload } from "lucide-react";
+import { Clock, Cloud, Save, Loader2, Upload, AlertTriangle, ExternalLink } from "lucide-react";
 import {
   getBackupScheduleApi,
   updateBackupScheduleApi,
@@ -164,6 +164,51 @@ export default function BackupSettings() {
             </span>
           </div>
 
+          {/* Last error */}
+          {gdrive?.lastError && (
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={14} className="text-red-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-red-600 dark:text-red-400">
+                  <p className="font-medium mb-1">Last upload failed</p>
+                  <p>{gdrive.lastError}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Setup instructions */}
+          {!gdrive?.configured && (
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+              <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Setup steps:</p>
+              <ol className="text-xs text-blue-600 dark:text-blue-400 space-y-1 list-decimal list-inside">
+                <li>Create a project in the <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="underline">Google Cloud Console</a></li>
+                <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noreferrer" className="underline">Google Drive API</a> for your project</li>
+                <li>Create a Service Account under IAM &gt; Service Accounts</li>
+                <li>Download the JSON key file and upload it below</li>
+                <li>Share your Drive folder with the service account email</li>
+              </ol>
+            </div>
+          )}
+
+          {/* API enable link when configured but API is disabled */}
+          {gdrive?.configured && gdrive.projectId && gdrive.lastError?.includes("API has not been used") && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
+                The Google Drive API needs to be enabled for your project:
+              </p>
+              <a
+                href={`https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${gdrive.projectId}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 underline"
+              >
+                <ExternalLink size={12} />
+                Enable Google Drive API for project {gdrive.projectId}
+              </a>
+            </div>
+          )}
+
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
               Service Account Key File
@@ -190,11 +235,15 @@ export default function BackupSettings() {
                 onChange={(e) => setCredFile(e.target.files?.[0] || null)}
               />
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Upload a Google Cloud service account JSON key file.
-              Create one in the Google Cloud Console under IAM &gt; Service Accounts.
-            </p>
           </div>
+
+          {/* Show service account email when configured */}
+          {gdrive?.configured && gdrive.serviceAccountEmail && (
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Service account: <span className="font-mono">{gdrive.serviceAccountEmail}</span>
+              <br />Share your Drive folder with this email address.
+            </p>
+          )}
 
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
@@ -208,8 +257,8 @@ export default function BackupSettings() {
               className="input text-sm py-1.5 px-3 w-full"
             />
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              The ID from the Drive folder URL. Share the folder with the service account email.
-              Leave blank to use the service account's root.
+              The ID from the Drive folder URL (the long string after <span className="font-mono">/folders/</span>).
+              Leave blank to upload to the service account's root.
             </p>
           </div>
 

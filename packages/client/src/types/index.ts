@@ -110,4 +110,7 @@ export interface BackupSchedule {
 export interface GoogleDriveConfig {
   configured: boolean;
   folderId: string;
+  projectId: string | null;
+  serviceAccountEmail: string | null;
+  lastError: string | null;
 }

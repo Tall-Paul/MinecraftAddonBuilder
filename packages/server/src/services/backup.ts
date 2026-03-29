@@ -119,6 +119,7 @@ export async function createBackup(containerId: string): Promise<Backup> {
     if (err.response?.data) {
       console.error(`gdrive: API error details:`, JSON.stringify(err.response.data));
     }
+    lastGdriveError = err.message || "Unknown error";
   }
 
   return backup;
@@ -248,11 +249,33 @@ function cleanOldBackups(keepPerServer: number): void {
 
 // ── Google Drive integration ─────────────────────────────────────────
 
-export function getGoogleDriveConfig(): { configured: boolean; folderId: string } {
+// Track the last Google Drive error so we can surface it in the UI
+let lastGdriveError: string | null = null;
+
+export function getGoogleDriveConfig(): {
+  configured: boolean;
+  folderId: string;
+  projectId: string | null;
+  serviceAccountEmail: string | null;
+  lastError: string | null;
+} {
   const db = getDb();
   const credPath = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value;
   const folderId = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_folder_id'").get() as any)?.value || "";
-  return { configured: !!credPath && fs.existsSync(credPath), folderId };
+  const configured = !!credPath && fs.existsSync(credPath);
+
+  let projectId: string | null = null;
+  let serviceAccountEmail: string | null = null;
+
+  if (configured && credPath) {
+    try {
+      const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+      projectId = creds.project_id || null;
+      serviceAccountEmail = creds.client_email || null;
+    } catch { /* best effort */ }
+  }
+
+  return { configured, folderId, projectId, serviceAccountEmail, lastError: lastGdriveError };
 }
 
 export function setGoogleDriveConfig(credentialsPath: string, folderId: string): void {
@@ -315,6 +338,7 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
   });
 
   console.log(`gdrive: upload complete, file ID = ${response.data.id}`);
+  lastGdriveError = null;
   return response.data.id || null;
 }
 
