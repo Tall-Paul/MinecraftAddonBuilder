@@ -54,7 +54,8 @@ while true; do
 
   # Rebuild only the app service and recreate it
   # --no-deps avoids restarting the updater itself
-  docker compose build addon-manager 2>&1
+  COMMIT=$(git rev-parse --short HEAD)
+  docker compose build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
   docker compose up -d --no-deps addon-manager 2>&1
 
   echo "updater: done, app restarted with $(git rev-parse --short HEAD)"

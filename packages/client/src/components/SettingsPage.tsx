@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, CheckCircle } from "lucide-react";
-import { getSettingsApi, updateSettingsApi, getDockerNetworks } from "../api/client.js";
+import { Save, CheckCircle, GitCommit } from "lucide-react";
+import { getSettingsApi, updateSettingsApi, getDockerNetworks, getStatus } from "../api/client.js";
 import BackupSettings from "./BackupSettings.js";
 import type { ServerDefaults } from "../types/index.js";
 
@@ -313,6 +313,28 @@ export default function SettingsPage() {
         <h2 className="text-2xl font-bold mb-6">Backups</h2>
         <BackupSettings />
       </div>
+
+      {/* Version Info */}
+      <VersionInfo />
+    </div>
+  );
+}
+
+function VersionInfo() {
+  const { data: status } = useQuery({
+    queryKey: ["status"],
+    queryFn: getStatus,
+    staleTime: 60_000,
+  });
+
+  if (!status?.gitCommit || status.gitCommit === "dev") return null;
+
+  return (
+    <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
+      <span className="inline-flex items-center gap-1">
+        <GitCommit size={12} />
+        Version: {status.gitCommit}
+      </span>
     </div>
   );
 }

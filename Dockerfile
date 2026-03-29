@@ -58,6 +58,8 @@ COPY .env.example ./
 # Create data directories
 RUN mkdir -p /app/data/cache /app/data/backups
 
+ARG GIT_COMMIT=unknown
+ENV GIT_COMMIT=$GIT_COMMIT
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV CACHE_DIR=/app/data/cache

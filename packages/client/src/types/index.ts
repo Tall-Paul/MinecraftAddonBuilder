@@ -72,6 +72,7 @@ export interface AppStatus {
   status: string;
   dockerConnected: boolean;
   curseforgeConfigured: boolean;
+  gitCommit: string;
 }
 
 export interface ServerDefaults {
