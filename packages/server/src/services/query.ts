@@ -25,16 +25,18 @@ export function queryBedrockServer(host: string, port: number, timeoutMs = 3000)
       clearTimeout(timer);
       try {
         // RakNet Unconnected Pong response
-        // Skip header bytes and parse the payload string
         // Format: ID_UNCONNECTED_PONG (0x1c) + 8 bytes time + 8 bytes server GUID + 16 bytes magic + 2 bytes string length + string
-        const offset = 35; // 1 + 8 + 8 + 16 + 2
-        const payload = msg.subarray(offset).toString("utf-8");
+        const headerLen = 1 + 8 + 8 + 16; // 33 bytes before string length
+        const strLen = msg.readUInt16BE(headerLen);
+        const payload = msg.subarray(headerLen + 2, headerLen + 2 + strLen).toString("utf-8");
         // Payload format: "MCPE;server name;protocol;version;players;max players;..."
         const parts = payload.split(";");
+        console.log(`query: parsed ${parts.length} fields, players=${parts[4]}, max=${parts[5]}`);
         const playerCount = parseInt(parts[4], 10) || 0;
         const maxPlayers = parseInt(parts[5], 10) || 0;
         resolve({ online: true, playerCount, maxPlayers });
-      } catch {
+      } catch (err) {
+        console.log(`query: failed to parse pong response (${msg.length} bytes):`, err);
         resolve({ online: true, playerCount: 0, maxPlayers: 0 });
       }
       socket.close();
