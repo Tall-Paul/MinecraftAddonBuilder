@@ -181,6 +181,13 @@ export async function getPlayerCount(container: Dockerode.Container): Promise<{ 
  * Attaches to the container, writes the command, reads output, then detaches.
  */
 async function sendViaStdin(container: Dockerode.Container, command: string): Promise<string | null> {
+  // Check if container uses TTY (affects stream format)
+  let isTty = true;
+  try {
+    const info = await container.inspect();
+    isTty = info.Config?.Tty ?? true;
+  } catch { /* assume TTY */ }
+
   return new Promise((resolve) => {
     const timeout = setTimeout(() => resolve(null), 5000);
 
@@ -209,12 +216,39 @@ async function sendViaStdin(container: Dockerode.Container, command: string): Pr
         setTimeout(() => {
           clearTimeout(timeout);
           try { stream.end(); } catch { /* ignore */ }
-          const output = Buffer.concat(chunks).toString("utf-8");
+
+          let raw = Buffer.concat(chunks);
+
+          // If not TTY, Docker multiplexes the stream with 8-byte frame headers
+          if (!isTty) {
+            raw = demuxDockerStream(raw);
+          }
+
+          // Strip ANSI escape sequences and control characters
+          const output = raw.toString("utf-8")
+            .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") // ANSI escape sequences
+            .replace(/\r/g, "")                      // carriage returns
+            .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ""); // other control chars
+
+          console.log(`sendViaStdin: cleaned output = ${JSON.stringify(output.substring(0, 300))}`);
           resolve(output || null);
         }, 1500);
       },
     );
   });
+}
+
+/** Demultiplex Docker attach stream (strip 8-byte frame headers). */
+function demuxDockerStream(buf: Buffer): Buffer {
+  const parts: Buffer[] = [];
+  let offset = 0;
+  while (offset + 8 <= buf.length) {
+    const size = buf.readUInt32BE(offset + 4);
+    if (offset + 8 + size > buf.length) break;
+    parts.push(buf.subarray(offset + 8, offset + 8 + size));
+    offset += 8 + size;
+  }
+  return parts.length > 0 ? Buffer.concat(parts) : buf;
 }
 
 /**
