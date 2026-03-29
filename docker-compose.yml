@@ -10,6 +10,23 @@ services:
       - ./.env:/app/.env:ro                          # Config file with API keys
     restart: unless-stopped
 
+  updater:
+    build:
+      context: .
+      dockerfile: Dockerfile.updater
+    container_name: mc-addon-updater
+    working_dir: /repo
+    entrypoint: /bin/sh
+    command: /repo/updater.sh
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # Docker API to rebuild/restart
+      - .:/repo                                     # Git repo for pull
+    environment:
+      - UPDATE_INTERVAL=300                          # Check every 5 minutes
+      - UPDATE_BRANCH=main
+      - GIT_TOKEN=${GIT_TOKEN:-}                     # GitHub PAT for private repos
+    restart: unless-stopped
+
   # ─── Example Bedrock server (uncomment to test) ──────────────────────
   # bedrock-server:
   #   image: itzg/minecraft-bedrock-server
