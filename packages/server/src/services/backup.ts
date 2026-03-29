@@ -115,7 +115,10 @@ export async function createBackup(containerId: string): Promise<Backup> {
       console.log(`backup: uploaded to Google Drive (${driveId})`);
     }
   } catch (err: any) {
-    console.log(`backup: Google Drive upload skipped: ${err.message}`);
+    console.error(`backup: Google Drive upload failed: ${err.message}`);
+    if (err.response?.data) {
+      console.error(`gdrive: API error details:`, JSON.stringify(err.response.data));
+    }
   }
 
   return backup;
@@ -269,8 +272,19 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
   const credPath = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value;
   const folderId = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_folder_id'").get() as any)?.value;
 
-  if (!credPath || !fs.existsSync(credPath)) return null;
+  console.log(`gdrive: credentials path = ${credPath || "(not set)"}`);
+  console.log(`gdrive: folder ID = ${folderId || "(not set)"}`);
 
+  if (!credPath) {
+    console.log("gdrive: no credentials path configured, skipping upload");
+    return null;
+  }
+  if (!fs.existsSync(credPath)) {
+    console.log(`gdrive: credentials file not found at ${credPath}, skipping upload`);
+    return null;
+  }
+
+  console.log(`gdrive: authenticating with service account...`);
   const auth = new google.auth.GoogleAuth({
     keyFile: credPath,
     scopes: ["https://www.googleapis.com/auth/drive.file"],
@@ -279,7 +293,15 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
   const drive = google.drive({ version: "v3", auth });
 
   const fileMetadata: any = { name: fileName };
-  if (folderId) fileMetadata.parents = [folderId];
+  if (folderId) {
+    fileMetadata.parents = [folderId];
+    console.log(`gdrive: uploading "${fileName}" to folder ${folderId}`);
+  } else {
+    console.log(`gdrive: uploading "${fileName}" to root (no folder ID configured)`);
+  }
+
+  const fileSize = fs.statSync(filePath).size;
+  console.log(`gdrive: file size = ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
 
   const media = {
     mimeType: "application/zip",
@@ -292,6 +314,7 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
     fields: "id",
   });
 
+  console.log(`gdrive: upload complete, file ID = ${response.data.id}`);
   return response.data.id || null;
 }
 
