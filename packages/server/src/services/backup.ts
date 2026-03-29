@@ -247,94 +247,140 @@ function cleanOldBackups(keepPerServer: number): void {
   }
 }
 
-// ── Google Drive integration ─────────────────────────────────────────
+// ── Google Drive integration (OAuth2) ────────────────────────────────
 
 // Track the last Google Drive error so we can surface it in the UI
 let lastGdriveError: string | null = null;
 
+const GDRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file"];
+
+/** Read a setting from the DB */
+function getSetting(key: string): string | undefined {
+  return (getDb().prepare("SELECT value FROM settings WHERE key = ?").get(key) as any)?.value;
+}
+
+/** Write a setting to the DB */
+function setSetting(key: string, value: string): void {
+  getDb().prepare(
+    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+  ).run(key, value);
+}
+
+/** Load OAuth2 client credentials from the stored JSON file */
+function loadOAuth2Credentials(baseUrl?: string): { clientId: string; clientSecret: string; redirectUri: string } | null {
+  const credPath = getSetting("gdrive_credentials_path");
+  if (!credPath || !fs.existsSync(credPath)) return null;
+
+  try {
+    const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
+    // Support both "installed" (Desktop app) and "web" credential types
+    const c = creds.installed || creds.web;
+    if (!c?.client_id || !c?.client_secret) return null;
+    // Use the app's own callback URL as the redirect URI
+    const redirectUri = baseUrl
+      ? `${baseUrl}/api/backups/gdrive/callback`
+      : c.redirect_uris?.[0] || "http://localhost:3000/api/backups/gdrive/callback";
+    return { clientId: c.client_id, clientSecret: c.client_secret, redirectUri };
+  } catch {
+    return null;
+  }
+}
+
 export function getGoogleDriveConfig(): {
   configured: boolean;
+  authorized: boolean;
   folderId: string;
-  projectId: string | null;
-  serviceAccountEmail: string | null;
   lastError: string | null;
 } {
-  const db = getDb();
-  const credPath = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value;
-  const folderId = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_folder_id'").get() as any)?.value || "";
-  const configured = !!credPath && fs.existsSync(credPath);
-
-  let projectId: string | null = null;
-  let serviceAccountEmail: string | null = null;
-
-  if (configured && credPath) {
-    try {
-      const creds = JSON.parse(fs.readFileSync(credPath, "utf-8"));
-      projectId = creds.project_id || null;
-      serviceAccountEmail = creds.client_email || null;
-    } catch { /* best effort */ }
-  }
-
-  return { configured, folderId, projectId, serviceAccountEmail, lastError: lastGdriveError };
+  const creds = loadOAuth2Credentials();
+  const folderId = getSetting("gdrive_folder_id") || "";
+  const refreshToken = getSetting("gdrive_refresh_token");
+  return {
+    configured: !!creds,
+    authorized: !!creds && !!refreshToken,
+    folderId,
+    lastError: lastGdriveError,
+  };
 }
 
 export function setGoogleDriveConfig(credentialsPath: string, folderId: string): void {
   if (credentialsPath && !fs.existsSync(credentialsPath)) {
     throw new Error(`Credentials file not found: ${credentialsPath}`);
   }
-  const db = getDb();
-  const upsert = db.prepare(
-    "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
-  );
-  upsert.run("gdrive_credentials_path", credentialsPath);
-  upsert.run("gdrive_folder_id", folderId);
+  setSetting("gdrive_credentials_path", credentialsPath);
+  setSetting("gdrive_folder_id", folderId);
+}
+
+/** Generate the Google OAuth2 authorization URL */
+export function getGoogleAuthUrl(baseUrl?: string): string {
+  const creds = loadOAuth2Credentials(baseUrl);
+  if (!creds) throw new Error("No OAuth2 credentials configured");
+
+  console.log(`gdrive: generating auth URL with redirect to ${creds.redirectUri}`);
+  const oauth2 = new google.auth.OAuth2(creds.clientId, creds.clientSecret, creds.redirectUri);
+  return oauth2.generateAuthUrl({
+    access_type: "offline",
+    prompt: "consent",
+    scope: GDRIVE_SCOPES,
+  });
+}
+
+/** Exchange an authorization code for tokens and store the refresh token */
+export async function exchangeAuthCode(code: string, baseUrl?: string): Promise<void> {
+  const creds = loadOAuth2Credentials(baseUrl);
+  if (!creds) throw new Error("No OAuth2 credentials configured");
+
+  const oauth2 = new google.auth.OAuth2(creds.clientId, creds.clientSecret, creds.redirectUri);
+  const { tokens } = await oauth2.getToken(code);
+
+  if (!tokens.refresh_token) {
+    throw new Error("No refresh token received. Try revoking app access in your Google account and authorizing again.");
+  }
+
+  setSetting("gdrive_refresh_token", tokens.refresh_token);
+  lastGdriveError = null;
+  console.log("gdrive: OAuth2 authorization successful, refresh token stored");
+}
+
+/** Build an authenticated OAuth2 client using the stored refresh token */
+function getOAuth2Client(): any | null {
+  const creds = loadOAuth2Credentials();
+  const refreshToken = getSetting("gdrive_refresh_token");
+  if (!creds || !refreshToken) return null;
+
+  const oauth2 = new google.auth.OAuth2(creds.clientId, creds.clientSecret, creds.redirectUri);
+  oauth2.setCredentials({ refresh_token: refreshToken });
+  return oauth2;
 }
 
 async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<string | null> {
-  const db = getDb();
-  const credPath = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value;
-  const folderId = (db.prepare("SELECT value FROM settings WHERE key = 'gdrive_folder_id'").get() as any)?.value;
+  const folderId = getSetting("gdrive_folder_id");
+  const auth = getOAuth2Client();
 
-  console.log(`gdrive: credentials path = ${credPath || "(not set)"}`);
-  console.log(`gdrive: folder ID = ${folderId || "(not set)"}`);
-
-  if (!credPath) {
-    console.log("gdrive: no credentials path configured, skipping upload");
+  if (!auth) {
+    console.log("gdrive: not authorized, skipping upload");
     return null;
   }
-  if (!fs.existsSync(credPath)) {
-    console.log(`gdrive: credentials file not found at ${credPath}, skipping upload`);
-    return null;
-  }
-  if (!folderId) {
-    console.log("gdrive: no folder ID configured, skipping upload (service accounts require a shared folder)");
-    return null;
-  }
-
-  console.log(`gdrive: authenticating with service account...`);
-  const auth = new google.auth.GoogleAuth({
-    keyFile: credPath,
-    scopes: ["https://www.googleapis.com/auth/drive.file"],
-  });
 
   const drive = google.drive({ version: "v3", auth });
 
-  const fileMetadata: any = {
-    name: fileName,
-    parents: [folderId],
-  };
+  const fileMetadata: any = { name: fileName };
+  if (folderId) {
+    fileMetadata.parents = [folderId];
+    console.log(`gdrive: uploading "${fileName}" to folder ${folderId}`);
+  } else {
+    console.log(`gdrive: uploading "${fileName}" to root`);
+  }
 
   const fileSize = fs.statSync(filePath).size;
-  console.log(`gdrive: uploading "${fileName}" (${(fileSize / 1024 / 1024).toFixed(1)}MB) to folder ${folderId}`);
-
-  const media = {
-    mimeType: "application/zip",
-    body: fs.createReadStream(filePath),
-  };
+  console.log(`gdrive: file size = ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
 
   const response = await drive.files.create({
     requestBody: fileMetadata,
-    media,
+    media: {
+      mimeType: "application/zip",
+      body: fs.createReadStream(filePath),
+    },
     fields: "id",
     supportsAllDrives: true,
   });

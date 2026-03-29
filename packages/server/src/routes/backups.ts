@@ -12,6 +12,8 @@ import {
   setBackupSchedule,
   getGoogleDriveConfig,
   setGoogleDriveConfig,
+  getGoogleAuthUrl,
+  exchangeAuthCode,
 } from "../services/backup.js";
 
 const upload = multer({ dest: path.join(config.cacheDir, "uploads") });
@@ -50,19 +52,22 @@ router.get("/gdrive", async (_req, res) => {
   }
 });
 
-// POST /api/backups/gdrive — Upload credentials file and update config
+// POST /api/backups/gdrive — Upload OAuth2 credentials file and update config
 router.post("/gdrive", upload.single("credentials"), async (req, res) => {
   try {
     const folderId = req.body.folderId || "";
     let credentialsPath = "";
 
     if (req.file) {
-      // Validate it's valid JSON with expected fields
+      // Validate it's valid JSON with OAuth2 client credentials
       const content = fs.readFileSync(req.file.path, "utf-8");
       const parsed = JSON.parse(content);
-      if (!parsed.client_email || !parsed.private_key) {
+      const creds = parsed.installed || parsed.web;
+      if (!creds?.client_id || !creds?.client_secret) {
         fs.unlinkSync(req.file.path);
-        return res.status(400).json({ error: "Invalid service account key: missing client_email or private_key" });
+        return res.status(400).json({
+          error: "Invalid credentials file. Download an OAuth 2.0 Client ID JSON (Desktop app type) from the Google Cloud Console.",
+        });
       }
 
       // Move to data dir with a stable name
@@ -74,7 +79,6 @@ router.post("/gdrive", upload.single("credentials"), async (req, res) => {
     setGoogleDriveConfig(credentialsPath, folderId);
     res.json(getGoogleDriveConfig());
   } catch (err: any) {
-    // Clean up uploaded file on error
     if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
@@ -86,13 +90,39 @@ router.post("/gdrive", upload.single("credentials"), async (req, res) => {
 router.put("/gdrive", async (req, res) => {
   try {
     const { folderId } = req.body;
-    // Get existing creds path so we don't overwrite it
     const db = await import("../db/index.js");
     const existing = (db.getDb().prepare("SELECT value FROM settings WHERE key = 'gdrive_credentials_path'").get() as any)?.value || "";
     setGoogleDriveConfig(existing, folderId || "");
     res.json(getGoogleDriveConfig());
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/backups/gdrive/auth — Get the OAuth2 authorization URL
+router.get("/gdrive/auth", async (req, res) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const url = getGoogleAuthUrl(baseUrl);
+    res.json({ url });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/backups/gdrive/callback — OAuth2 callback (Google redirects here)
+router.get("/gdrive/callback", async (req, res) => {
+  const code = req.query.code as string;
+  if (!code) {
+    return res.status(400).send("Missing authorization code");
+  }
+  try {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    await exchangeAuthCode(code, baseUrl);
+    // Redirect back to the settings page
+    res.redirect("/#settings");
+  } catch (err: any) {
+    res.status(500).send(`Authorization failed: ${err.message}`);
   }
 });
 

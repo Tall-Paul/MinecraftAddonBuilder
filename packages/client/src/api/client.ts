@@ -299,6 +299,10 @@ export async function getGoogleDriveConfigApi(): Promise<GoogleDriveConfig> {
   return apiFetch("/backups/gdrive");
 }
 
+export async function getGoogleDriveAuthUrl(): Promise<{ url: string }> {
+  return apiFetch("/backups/gdrive/auth");
+}
+
 export async function uploadGoogleDriveCredentials(file: File | null, folderId: string): Promise<GoogleDriveConfig> {
   if (file) {
     const formData = new FormData();

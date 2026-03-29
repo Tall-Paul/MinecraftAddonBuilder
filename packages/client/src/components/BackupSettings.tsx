@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Clock, Cloud, Save, Loader2, Upload, AlertTriangle, ExternalLink } from "lucide-react";
+import { Clock, Cloud, Save, Loader2, Upload, AlertTriangle, ExternalLink, LogIn, CheckCircle } from "lucide-react";
 import {
   getBackupScheduleApi,
   updateBackupScheduleApi,
   getGoogleDriveConfigApi,
   uploadGoogleDriveCredentials,
+  getGoogleDriveAuthUrl,
   getServers,
 } from "../api/client.js";
 
@@ -151,16 +152,23 @@ export default function BackupSettings() {
         </h3>
 
         <div className="space-y-4">
-          <div className="flex items-center gap-2 mb-2">
+          {/* Status */}
+          <div className="flex items-center gap-2">
             <span
               className={`inline-block w-2 h-2 rounded-full ${
-                gdrive?.configured
+                gdrive?.authorized
                   ? "bg-green-500"
+                  : gdrive?.configured
+                  ? "bg-amber-500"
                   : "bg-gray-400 dark:bg-gray-600"
               }`}
             />
             <span className="text-sm">
-              {gdrive?.configured ? "Connected" : "Not configured"}
+              {gdrive?.authorized
+                ? "Connected"
+                : gdrive?.configured
+                ? "Credentials uploaded — authorization needed"
+                : "Not configured"}
             </span>
           </div>
 
@@ -182,48 +190,22 @@ export default function BackupSettings() {
             <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
               <p className="text-xs font-medium text-blue-700 dark:text-blue-300 mb-2">Setup steps:</p>
               <ol className="text-xs text-blue-600 dark:text-blue-400 space-y-1 list-decimal list-inside">
-                <li>Create a project in the <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="underline">Google Cloud Console</a></li>
-                <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noreferrer" className="underline">Google Drive API</a> for your project</li>
-                <li>Create a Service Account under IAM &gt; Service Accounts</li>
-                <li>Download the JSON key file and upload it below</li>
-                <li>Create a folder in your Google Drive for backups</li>
-                <li>Share the folder with the service account email (Editor access)</li>
-                <li>Paste the folder ID below (from the folder URL)</li>
+                <li>Go to the <a href="https://console.cloud.google.com" target="_blank" rel="noreferrer" className="underline">Google Cloud Console</a> and create a project (or use an existing one)</li>
+                <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noreferrer" className="underline">Google Drive API</a></li>
+                <li>Go to <strong>APIs &amp; Services &gt; Credentials</strong> and create an <strong>OAuth 2.0 Client ID</strong> (Desktop app type)</li>
+                <li>Download the JSON credentials file and upload it below</li>
+                <li>Click <strong>Authorize</strong> to connect your Google account</li>
               </ol>
-            </div>
-          )}
-
-          {/* Storage quota error hint */}
-          {gdrive?.lastError?.includes("storage quota") && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Service accounts have no storage quota. Make sure you've set a <strong>Folder ID</strong> below
-                and shared that folder with the service account email as an <strong>Editor</strong>.
+              <p className="text-xs text-blue-500 dark:text-blue-500 mt-2">
+                Note: You may need to add yourself as a test user under <strong>OAuth consent screen</strong> if the app is in testing mode.
               </p>
             </div>
           )}
 
-          {/* API enable link when configured but API is disabled */}
-          {gdrive?.configured && gdrive.projectId && gdrive.lastError?.includes("API has not been used") && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
-              <p className="text-xs text-amber-700 dark:text-amber-300 mb-2">
-                The Google Drive API needs to be enabled for your project:
-              </p>
-              <a
-                href={`https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=${gdrive.projectId}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-300 underline"
-              >
-                <ExternalLink size={12} />
-                Enable Google Drive API for project {gdrive.projectId}
-              </a>
-            </div>
-          )}
-
+          {/* Step 1: Upload credentials */}
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-              Service Account Key File
+              OAuth 2.0 Client Credentials
             </label>
             <div className="flex items-center gap-3">
               <button
@@ -232,7 +214,7 @@ export default function BackupSettings() {
                 className="btn-secondary text-sm py-1.5"
               >
                 <Upload size={14} className="inline mr-1" />
-                {credFile ? credFile.name : gdrive?.configured ? "Replace credentials" : "Upload JSON key"}
+                {credFile ? credFile.name : gdrive?.configured ? "Replace credentials" : "Upload JSON"}
               </button>
               {credFile && (
                 <span className="text-xs text-green-600 dark:text-green-400">
@@ -249,17 +231,10 @@ export default function BackupSettings() {
             </div>
           </div>
 
-          {/* Show service account email when configured */}
-          {gdrive?.configured && gdrive.serviceAccountEmail && (
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Service account: <span className="font-mono">{gdrive.serviceAccountEmail}</span>
-              <br />Share your Drive folder with this email address.
-            </p>
-          )}
-
+          {/* Step 2: Folder ID (optional now — uploads to root by default) */}
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-              Google Drive Folder ID <span className="text-red-400">*</span>
+              Google Drive Folder ID (optional)
             </label>
             <input
               type="text"
@@ -267,31 +242,56 @@ export default function BackupSettings() {
               onChange={(e) => setFolderId(e.target.value)}
               placeholder="e.g. 1ABC123def456..."
               className="input text-sm py-1.5 px-3 w-full"
-              required
             />
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              Required — service accounts have no storage quota of their own, so backups must be
-              uploaded to a folder you own. Create a folder in your Google Drive, share it with the
-              service account email (Editor access), and paste the folder ID here (the long string
-              after <span className="font-mono">/folders/</span> in the URL).
+              Paste the folder ID from the URL (the string after <span className="font-mono">/folders/</span>).
+              Leave blank to upload to your Drive root.
             </p>
           </div>
 
-          <button
-            onClick={() => gdriveMutation.mutate()}
-            disabled={gdriveMutation.isPending}
-            className="btn-primary text-sm"
-          >
-            {gdriveMutation.isPending ? (
-              <Loader2 size={14} className="inline mr-1 animate-spin" />
-            ) : (
-              <Save size={14} className="inline mr-1" />
+          {/* Save + Authorize buttons */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => gdriveMutation.mutate()}
+              disabled={gdriveMutation.isPending}
+              className="btn-primary text-sm"
+            >
+              {gdriveMutation.isPending ? (
+                <Loader2 size={14} className="inline mr-1 animate-spin" />
+              ) : (
+                <Save size={14} className="inline mr-1" />
+              )}
+              Save
+            </button>
+
+            {gdrive?.configured && !gdrive.authorized && (
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const { url } = await getGoogleDriveAuthUrl();
+                    window.open(url, "_blank");
+                  } catch (err: any) {
+                    alert(`Failed to get auth URL: ${err.message}`);
+                  }
+                }}
+                className="btn-primary text-sm bg-blue-600 hover:bg-blue-700"
+              >
+                <LogIn size={14} className="inline mr-1" />
+                Authorize Google Account
+              </button>
             )}
-            Save Google Drive Settings
-          </button>
+
+            {gdrive?.authorized && (
+              <span className="text-green-600 dark:text-green-400 text-sm flex items-center gap-1">
+                <CheckCircle size={14} />
+                Authorized
+              </span>
+            )}
+          </div>
 
           {gdriveMutation.isSuccess && (
-            <p className="text-sm text-green-600 dark:text-green-400">Google Drive settings saved</p>
+            <p className="text-sm text-green-600 dark:text-green-400">Settings saved</p>
           )}
           {gdriveMutation.isError && (
             <p className="text-sm text-red-600 dark:text-red-400">
