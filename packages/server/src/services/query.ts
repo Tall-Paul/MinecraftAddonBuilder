@@ -153,8 +153,15 @@ export async function getOperators(container: Dockerode.Container, basePath: str
  */
 export async function getPlayerCount(container: Dockerode.Container): Promise<{ playerCount: number; maxPlayers: number }> {
   try {
-    const output = await execInContainer(container, ["send-command", "list"]);
-    console.log(`getPlayerCount: raw output = ${JSON.stringify(output?.substring(0, 300))}`);
+    // Try send-command first (itzg images)
+    let output = await execInContainer(container, ["send-command", "list"]);
+
+    // Fallback: send "list" via stdin and read from the log
+    if (!output || output.includes("executable file not found")) {
+      output = await sendViaStdin(container, "list");
+    }
+
+    console.log(`getPlayerCount: output = ${JSON.stringify(output?.substring(0, 200))}`);
     if (!output) return { playerCount: 0, maxPlayers: 0 };
 
     for (const line of output.split("\n")) {
@@ -167,12 +174,52 @@ export async function getPlayerCount(container: Dockerode.Container): Promise<{ 
         };
       }
     }
-    console.log(`getPlayerCount: no match in output`);
     return { playerCount: 0, maxPlayers: 0 };
   } catch (err: any) {
     console.log(`getPlayerCount: error: ${err.message}`);
     return { playerCount: 0, maxPlayers: 0 };
   }
+}
+
+/**
+ * Send a command to the Bedrock server via Docker attach (stdin/stdout).
+ * Attaches to the container, writes the command, reads output, then detaches.
+ */
+async function sendViaStdin(container: Dockerode.Container, command: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => resolve(null), 5000);
+
+    container.attach(
+      { stream: true, stdin: true, stdout: true, stderr: true, hijack: true },
+      (err, stream) => {
+        if (err || !stream) {
+          clearTimeout(timeout);
+          return resolve(null);
+        }
+
+        const chunks: Buffer[] = [];
+        let collecting = false;
+
+        stream.on("data", (chunk: Buffer) => {
+          if (collecting) {
+            chunks.push(chunk);
+          }
+        });
+
+        // Start collecting after we send the command
+        collecting = true;
+        stream.write(command + "\n");
+
+        // Give the server time to respond, then collect
+        setTimeout(() => {
+          clearTimeout(timeout);
+          try { stream.end(); } catch { /* ignore */ }
+          const output = Buffer.concat(chunks).toString("utf-8");
+          resolve(output || null);
+        }, 1500);
+      },
+    );
+  });
 }
 
 /**
