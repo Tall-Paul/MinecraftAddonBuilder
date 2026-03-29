@@ -26,6 +26,8 @@ router.get("/", async (_req, res) => {
     const servers = await listBedrockServers();
 
     // Query player counts in parallel for running servers via console command
+    const runningCount = servers.filter(s => s.status === "running").length;
+    console.log(`servers: querying player counts for ${runningCount} running server(s)`);
     const serversWithPlayers = await Promise.all(
       servers.map(async (server) => {
         if (server.status !== "running") return server;
@@ -34,8 +36,10 @@ router.get("/", async (_req, res) => {
           const container = docker.getContainer(server.containerId);
           const { getPlayerCount } = await import("../services/query.js");
           const counts = await getPlayerCount(container);
+          console.log(`servers: ${server.containerName} players=${counts.playerCount}/${counts.maxPlayers}`);
           return { ...server, ...counts };
-        } catch {
+        } catch (err: any) {
+          console.log(`servers: failed to query ${server.containerName}: ${err.message}`);
           return server;
         }
       })

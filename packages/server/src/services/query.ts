@@ -152,19 +152,27 @@ export async function getOperators(container: Dockerode.Container, basePath: str
  * More reliable than UDP query when running from another container.
  */
 export async function getPlayerCount(container: Dockerode.Container): Promise<{ playerCount: number; maxPlayers: number }> {
-  const output = await execInContainer(container, ["send-command", "list"]);
-  if (!output) return { playerCount: 0, maxPlayers: 0 };
+  try {
+    const output = await execInContainer(container, ["send-command", "list"]);
+    console.log(`getPlayerCount: raw output = ${JSON.stringify(output?.substring(0, 300))}`);
+    if (!output) return { playerCount: 0, maxPlayers: 0 };
 
-  for (const line of output.split("\n")) {
-    const match = line.match(/There are (\d+)\/(\d+) players online/i);
-    if (match) {
-      return {
-        playerCount: parseInt(match[1], 10),
-        maxPlayers: parseInt(match[2], 10),
-      };
+    for (const line of output.split("\n")) {
+      const match = line.match(/There are (\d+)\/(\d+) players online/i);
+      if (match) {
+        console.log(`getPlayerCount: found ${match[1]}/${match[2]} players`);
+        return {
+          playerCount: parseInt(match[1], 10),
+          maxPlayers: parseInt(match[2], 10),
+        };
+      }
     }
+    console.log(`getPlayerCount: no match in output`);
+    return { playerCount: 0, maxPlayers: 0 };
+  } catch (err: any) {
+    console.log(`getPlayerCount: error: ${err.message}`);
+    return { playerCount: 0, maxPlayers: 0 };
   }
-  return { playerCount: 0, maxPlayers: 0 };
 }
 
 /**
