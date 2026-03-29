@@ -48,4 +48,63 @@ router.put("/", (req, res) => {
   }
 });
 
+// POST /api/settings/update — trigger an immediate update check
+router.post("/update", async (_req, res) => {
+  try {
+    const docker = new Dockerode({ socketPath: config.dockerSocket });
+    const container = docker.getContainer("mc-addon-updater");
+
+    // Verify the updater container is running
+    const info = await container.inspect();
+    if (info.State.Status !== "running") {
+      return res.status(400).json({ error: "Updater container is not running" });
+    }
+
+    // Exec the update script inside the updater container
+    const exec = await container.exec({
+      Cmd: ["sh", "-c", [
+        "cd /repo",
+        "git fetch origin ${UPDATE_BRANCH:-main} 2>&1",
+        "LOCAL=$(git rev-parse HEAD)",
+        "REMOTE=$(git rev-parse origin/${UPDATE_BRANCH:-main})",
+        "if [ \"$LOCAL\" = \"$REMOTE\" ]; then echo '{\"status\":\"up-to-date\",\"commit\":\"'$(git rev-parse --short HEAD)'\"}'; exit 0; fi",
+        "git pull origin ${UPDATE_BRANCH:-main} 2>&1",
+        "COMMIT=$(git rev-parse --short HEAD)",
+        // Detect compose project name and rebuild
+        "PROJECT=$(docker inspect mc-addon-manager --format '{{index .Config.Labels \"com.docker.compose.project\"}}' 2>/dev/null || echo '')",
+        "COMPOSE=\"docker compose ${PROJECT:+-p $PROJECT} -f /repo/docker-compose.yml\"",
+        "$COMPOSE build --build-arg GIT_COMMIT=$COMMIT addon-manager 2>&1",
+        "$COMPOSE up -d --no-deps addon-manager 2>&1",
+        "echo '{\"status\":\"updated\",\"commit\":\"'$COMMIT'\"}'",
+      ].join(" && ")],
+      AttachStdout: true,
+      AttachStderr: true,
+      Tty: true,
+    });
+
+    const stream = await exec.start({ Detach: false, Tty: true });
+    const chunks: Buffer[] = [];
+    stream.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+    await new Promise<void>((resolve) => {
+      stream.on("end", resolve);
+      stream.on("error", resolve);
+    });
+
+    const output = Buffer.concat(chunks).toString("utf-8").trim();
+    // Try to parse the last line as JSON status
+    const lines = output.split("\n");
+    const lastLine = lines[lines.length - 1];
+    try {
+      const result = JSON.parse(lastLine);
+      res.json(result);
+    } catch {
+      res.json({ status: "done", output: output.substring(0, 500) });
+    }
+  } catch (err: any) {
+    console.error("Failed to trigger update:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;

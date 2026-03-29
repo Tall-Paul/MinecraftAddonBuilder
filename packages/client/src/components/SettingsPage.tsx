@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Save, CheckCircle, GitCommit } from "lucide-react";
-import { getSettingsApi, updateSettingsApi, getDockerNetworks, getStatus } from "../api/client.js";
+import { Save, CheckCircle, GitCommit, RefreshCw, Loader2 } from "lucide-react";
+import { getSettingsApi, updateSettingsApi, getDockerNetworks, getStatus, triggerUpdate } from "../api/client.js";
 import BackupSettings from "./BackupSettings.js";
 import type { ServerDefaults } from "../types/index.js";
 
@@ -321,20 +321,66 @@ export default function SettingsPage() {
 }
 
 function VersionInfo() {
+  const [updating, setUpdating] = useState(false);
+  const [updateResult, setUpdateResult] = useState<string | null>(null);
+
   const { data: status } = useQuery({
     queryKey: ["status"],
     queryFn: getStatus,
     staleTime: 60_000,
   });
 
-  if (!status?.gitCommit || status.gitCommit === "dev") return null;
+  async function handleCheckUpdate() {
+    setUpdating(true);
+    setUpdateResult(null);
+    try {
+      const result = await triggerUpdate();
+      if (result.status === "up-to-date") {
+        setUpdateResult(`Already up to date (${result.commit})`);
+      } else if (result.status === "updated") {
+        setUpdateResult(`Updated to ${result.commit} — reloading...`);
+        // The app container is restarting, wait a bit then reload
+        setTimeout(() => window.location.reload(), 5000);
+      } else {
+        setUpdateResult("Update triggered");
+      }
+    } catch (err: any) {
+      setUpdateResult(`Update failed: ${err.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  }
 
   return (
-    <div className="mt-8 text-center text-xs text-gray-400 dark:text-gray-500">
-      <span className="inline-flex items-center gap-1">
-        <GitCommit size={12} />
-        Version: {status.gitCommit}
-      </span>
+    <div className="mt-8 card p-5">
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
+          <GitCommit size={14} />
+          Version: {status?.gitCommit && status.gitCommit !== "dev" && status.gitCommit !== "unknown"
+            ? status.gitCommit
+            : "development"}
+        </div>
+        <button
+          onClick={handleCheckUpdate}
+          disabled={updating}
+          className="btn-secondary text-xs py-1.5"
+        >
+          {updating ? (
+            <>
+              <Loader2 size={14} className="inline mr-1 animate-spin" />
+              Checking...
+            </>
+          ) : (
+            <>
+              <RefreshCw size={14} className="inline mr-1" />
+              Check for Updates
+            </>
+          )}
+        </button>
+      </div>
+      {updateResult && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{updateResult}</p>
+      )}
     </div>
   );
 }

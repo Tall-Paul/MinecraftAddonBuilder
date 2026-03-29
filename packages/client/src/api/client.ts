@@ -262,6 +262,10 @@ export async function updateSettingsApi(
   });
 }
 
+export async function triggerUpdate(): Promise<{ status: string; commit?: string; output?: string }> {
+  return apiFetch("/settings/update", { method: "POST" });
+}
+
 // Backups
 export async function createBackupApi(containerId: string): Promise<{ backup: Backup }> {
   return apiFetch(`/backups/${containerId}`, { method: "POST" });
