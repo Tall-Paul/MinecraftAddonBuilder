@@ -222,8 +222,23 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     };
   }
 
+  function handleZoomToPlayer(player: PlayerPosition) {
+    const area: MapAreaParams = {
+      blockX: player.x - 256,
+      blockZ: player.z - 256,
+      blockW: 512,
+      blockH: 512,
+      zoom: 2,
+    };
+    setZoomArea(area);
+    setLoading(true);
+    setError(null);
+    setMapUrl(getWorldMapUrl(serverId, false, area));
+  }
+
   const isOverview = !zoomArea;
   const canZoom = isOverview && meta && !loading;
+  const overworldPlayers = players.filter(p => p.dimension === 0);
 
   return (
     <div className="card p-5 mb-6">
@@ -270,6 +285,24 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
           <Crosshair size={12} />
           Click or drag to select an area to zoom in
         </p>
+      )}
+
+      {overworldPlayers.length > 0 && mapUrl && (
+        <div className="flex flex-wrap items-center gap-2 mb-2 text-sm">
+          <span className="text-gray-500 dark:text-gray-400 text-xs">Players:</span>
+          {overworldPlayers.map((player) => (
+            <button
+              key={player.name}
+              onClick={() => handleZoomToPlayer(player)}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800/60 transition-colors"
+              title={`Zoom to ${player.name} (${player.x}, ${player.z})`}
+            >
+              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+              {player.name}
+              <span className="text-blue-400 dark:text-blue-500">({player.x}, {player.z})</span>
+            </button>
+          ))}
+        </div>
       )}
 
       {serverStatus !== "running" && !mapUrl && (
@@ -322,7 +355,7 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
               <div style={getSelectionStyle()!} />
             )}
             {/* Player markers */}
-            {players.filter(p => p.dimension === 0).map((player) => {
+            {overworldPlayers.map((player) => {
               const pos = isOverview
                 ? blockToPercent(player.x, player.z)
                 : blockToPercentZoomed(player.x, player.z);
