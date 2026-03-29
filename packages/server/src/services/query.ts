@@ -81,17 +81,17 @@ export async function getPlayerNames(container: Dockerode.Container): Promise<st
       const count = parseInt(match[1], 10);
       if (count === 0) return [];
 
-      // Player names are usually on the next line or after the colon
-      const afterColon = line.split(":")[1]?.trim();
-      if (afterColon) {
-        return afterColon.split(",").map((s) => s.trim()).filter(Boolean);
+      // Player names may be after "online:" on the same line, or on the next line
+      const afterOnline = line.split(/players online:\s*/i)[1]?.trim();
+      if (afterOnline) {
+        return afterOnline.split(",").map((s) => s.trim()).filter(Boolean);
       }
 
       // Check the next line
       const idx = lines.indexOf(line);
       if (idx + 1 < lines.length) {
         const nextLine = lines[idx + 1].trim();
-        if (nextLine) {
+        if (nextLine && !nextLine.startsWith("[")) {
           return nextLine.split(",").map((s) => s.trim()).filter(Boolean);
         }
       }
