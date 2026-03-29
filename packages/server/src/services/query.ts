@@ -239,7 +239,7 @@ async function sendViaStdin(container: Dockerode.Container, command: string): Pr
 }
 
 /** Demultiplex Docker attach stream (strip 8-byte frame headers). */
-function demuxDockerStream(buf: Buffer): Buffer {
+function demuxDockerStream(buf: Buffer): Buffer<ArrayBufferLike> {
   const parts: Buffer[] = [];
   let offset = 0;
   while (offset + 8 <= buf.length) {
