@@ -59,7 +59,8 @@ while true; do
   COMMIT=$(git rev-parse --short HEAD)
 
   # Build the new image using docker compose (for build context/args)
-  docker compose -f /repo/docker-compose.yml --env-file /dev/null build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
+  BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  docker compose -f /repo/docker-compose.yml --env-file /dev/null build --build-arg "GIT_COMMIT=$COMMIT" --build-arg "BUILD_TIME=$BUILD_TIME" addon-manager 2>&1
 
   echo "updater: stopping old container..."
   docker stop "$CONTAINER_NAME" 2>&1 || true

@@ -4,6 +4,7 @@ services:
       context: .
       args:
         GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     container_name: mc-addon-manager
     ports:
       - "3000:3000"

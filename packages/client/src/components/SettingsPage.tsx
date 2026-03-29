@@ -62,6 +62,8 @@ export default function SettingsPage() {
     <div className="max-w-2xl">
       <h2 className="text-2xl font-bold mb-6">Settings</h2>
 
+      <VersionInfo />
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Network Configuration */}
         <div className="card p-5">
@@ -314,10 +316,18 @@ export default function SettingsPage() {
         <BackupSettings />
       </div>
 
-      {/* Version Info */}
-      <VersionInfo />
     </div>
   );
+}
+
+function formatBuildTime(iso: string): string {
+  try {
+    const date = new Date(iso);
+    if (isNaN(date.getTime())) return iso;
+    return date.toLocaleString();
+  } catch {
+    return iso;
+  }
 }
 
 function VersionInfo() {
@@ -339,7 +349,6 @@ function VersionInfo() {
         setUpdateResult(`Already up to date (${result.commit})`);
       } else if (result.status === "updated") {
         setUpdateResult(`Updated to ${result.commit} — reloading...`);
-        // The app container is restarting, wait a bit then reload
         setTimeout(() => window.location.reload(), 5000);
       } else {
         setUpdateResult("Update triggered");
@@ -351,14 +360,22 @@ function VersionInfo() {
     }
   }
 
+  const commit = status?.gitCommit || "unknown";
+  const buildTime = status?.buildTime;
+
   return (
-    <div className="mt-8 card p-5">
+    <div className="card p-5 mb-6">
       <div className="flex items-center justify-between">
-        <div className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2">
-          <GitCommit size={14} />
-          Version: {status?.gitCommit && status.gitCommit !== "dev" && status.gitCommit !== "unknown"
-            ? status.gitCommit
-            : "development"}
+        <div>
+          <div className="text-sm font-medium flex items-center gap-2">
+            <GitCommit size={14} />
+            Version: <span className="font-mono">{commit}</span>
+          </div>
+          {buildTime && buildTime !== "unknown" && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-6">
+              Built {formatBuildTime(buildTime)}
+            </p>
+          )}
         </div>
         <button
           onClick={handleCheckUpdate}

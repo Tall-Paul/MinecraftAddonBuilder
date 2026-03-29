@@ -59,7 +59,9 @@ COPY .env.example ./
 RUN mkdir -p /app/data/cache /app/data/backups
 
 ARG GIT_COMMIT=unknown
+ARG BUILD_TIME=unknown
 ENV GIT_COMMIT=$GIT_COMMIT
+ENV BUILD_TIME=$BUILD_TIME
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV CACHE_DIR=/app/data/cache

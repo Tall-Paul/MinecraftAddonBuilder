@@ -37,7 +37,8 @@ app.get("/api/status", async (_req, res) => {
     status: "ok",
     dockerConnected,
     curseforgeConfigured: !!config.curseforgeApiKey,
-    gitCommit: process.env.GIT_COMMIT || "dev",
+    gitCommit: process.env.GIT_COMMIT || "unknown",
+    buildTime: process.env.BUILD_TIME || null,
   });
 });
 
