@@ -186,8 +186,20 @@ export default function BackupSettings() {
                 <li>Enable the <a href="https://console.cloud.google.com/apis/library/drive.googleapis.com" target="_blank" rel="noreferrer" className="underline">Google Drive API</a> for your project</li>
                 <li>Create a Service Account under IAM &gt; Service Accounts</li>
                 <li>Download the JSON key file and upload it below</li>
-                <li>Share your Drive folder with the service account email</li>
+                <li>Create a folder in your Google Drive for backups</li>
+                <li>Share the folder with the service account email (Editor access)</li>
+                <li>Paste the folder ID below (from the folder URL)</li>
               </ol>
+            </div>
+          )}
+
+          {/* Storage quota error hint */}
+          {gdrive?.lastError?.includes("storage quota") && (
+            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Service accounts have no storage quota. Make sure you've set a <strong>Folder ID</strong> below
+                and shared that folder with the service account email as an <strong>Editor</strong>.
+              </p>
             </div>
           )}
 
@@ -247,7 +259,7 @@ export default function BackupSettings() {
 
           <div>
             <label className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-              Google Drive Folder ID (optional)
+              Google Drive Folder ID <span className="text-red-400">*</span>
             </label>
             <input
               type="text"
@@ -255,10 +267,13 @@ export default function BackupSettings() {
               onChange={(e) => setFolderId(e.target.value)}
               placeholder="e.g. 1ABC123def456..."
               className="input text-sm py-1.5 px-3 w-full"
+              required
             />
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-              The ID from the Drive folder URL (the long string after <span className="font-mono">/folders/</span>).
-              Leave blank to upload to the service account's root.
+              Required — service accounts have no storage quota of their own, so backups must be
+              uploaded to a folder you own. Create a folder in your Google Drive, share it with the
+              service account email (Editor access), and paste the folder ID here (the long string
+              after <span className="font-mono">/folders/</span> in the URL).
             </p>
           </div>
 

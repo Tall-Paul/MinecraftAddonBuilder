@@ -306,6 +306,10 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
     console.log(`gdrive: credentials file not found at ${credPath}, skipping upload`);
     return null;
   }
+  if (!folderId) {
+    console.log("gdrive: no folder ID configured, skipping upload (service accounts require a shared folder)");
+    return null;
+  }
 
   console.log(`gdrive: authenticating with service account...`);
   const auth = new google.auth.GoogleAuth({
@@ -315,16 +319,13 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
 
   const drive = google.drive({ version: "v3", auth });
 
-  const fileMetadata: any = { name: fileName };
-  if (folderId) {
-    fileMetadata.parents = [folderId];
-    console.log(`gdrive: uploading "${fileName}" to folder ${folderId}`);
-  } else {
-    console.log(`gdrive: uploading "${fileName}" to root (no folder ID configured)`);
-  }
+  const fileMetadata: any = {
+    name: fileName,
+    parents: [folderId],
+  };
 
   const fileSize = fs.statSync(filePath).size;
-  console.log(`gdrive: file size = ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
+  console.log(`gdrive: uploading "${fileName}" (${(fileSize / 1024 / 1024).toFixed(1)}MB) to folder ${folderId}`);
 
   const media = {
     mimeType: "application/zip",
@@ -335,6 +336,7 @@ async function uploadToGoogleDrive(filePath: string, fileName: string): Promise<
     requestBody: fileMetadata,
     media,
     fields: "id",
+    supportsAllDrives: true,
   });
 
   console.log(`gdrive: upload complete, file ID = ${response.data.id}`);
