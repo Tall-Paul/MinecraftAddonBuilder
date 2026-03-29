@@ -25,19 +25,16 @@ router.get("/", async (_req, res) => {
   try {
     const servers = await listBedrockServers();
 
-    // Query player counts in parallel for running servers
+    // Query player counts in parallel for running servers via console command
     const serversWithPlayers = await Promise.all(
       servers.map(async (server) => {
         if (server.status !== "running") return server;
         try {
-          const queryHost = server.ipAddress || "127.0.0.1";
-          const queryPort = server.ipAddress
-            ? 19132
-            : server.ports.find((p) => p.containerPort === 19132)?.hostPort || 19132;
-
-          const { queryBedrockServer } = await import("../services/query.js");
-          const status = await queryBedrockServer(queryHost, queryPort, 2000);
-          return { ...server, playerCount: status.playerCount, maxPlayers: status.maxPlayers };
+          const docker = getDockerInstance();
+          const container = docker.getContainer(server.containerId);
+          const { getPlayerCount } = await import("../services/query.js");
+          const counts = await getPlayerCount(container);
+          return { ...server, ...counts };
         } catch {
           return server;
         }

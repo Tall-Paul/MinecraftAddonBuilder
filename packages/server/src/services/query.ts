@@ -148,6 +148,26 @@ export async function getOperators(container: Dockerode.Container, basePath: str
 }
 
 /**
+ * Get player count and max players via the console `list` command.
+ * More reliable than UDP query when running from another container.
+ */
+export async function getPlayerCount(container: Dockerode.Container): Promise<{ playerCount: number; maxPlayers: number }> {
+  const output = await execInContainer(container, ["send-command", "list"]);
+  if (!output) return { playerCount: 0, maxPlayers: 0 };
+
+  for (const line of output.split("\n")) {
+    const match = line.match(/There are (\d+)\/(\d+) players online/i);
+    if (match) {
+      return {
+        playerCount: parseInt(match[1], 10),
+        maxPlayers: parseInt(match[2], 10),
+      };
+    }
+  }
+  return { playerCount: 0, maxPlayers: 0 };
+}
+
+/**
  * Get full server status: player count + player names.
  */
 export async function getServerStatus(
@@ -155,19 +175,17 @@ export async function getServerStatus(
   host: string,
   port: number
 ): Promise<ServerStatus> {
-  // Query player count via UDP
-  const query = await queryBedrockServer(host, port);
-
-  // Get player names via console command
+  // Get player count and names via console command (more reliable than UDP from another container)
+  const counts = await getPlayerCount(container);
   let players: string[] = [];
-  if (query.online && query.playerCount > 0) {
+  if (counts.playerCount > 0) {
     players = await getPlayerNames(container);
   }
 
   return {
-    online: query.online,
-    playerCount: query.playerCount,
-    maxPlayers: query.maxPlayers,
+    online: true,
+    playerCount: counts.playerCount,
+    maxPlayers: counts.maxPlayers,
     players,
   };
 }
