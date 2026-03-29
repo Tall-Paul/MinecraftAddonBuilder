@@ -23,7 +23,15 @@ if [ -n "$GIT_TOKEN" ]; then
   fi
 fi
 
-echo "updater: watching branch '$BRANCH' every ${INTERVAL}s"
+# Detect the compose project name from the running addon-manager container's labels
+PROJECT_NAME=$(docker inspect mc-addon-manager --format '{{index .Config.Labels "com.docker.compose.project"}}' 2>/dev/null || echo "")
+if [ -z "$PROJECT_NAME" ]; then
+  echo "updater: WARNING — could not detect project name, falling back to 'minecraftaddonbuilder'"
+  PROJECT_NAME="minecraftaddonbuilder"
+fi
+
+COMPOSE="docker compose -p $PROJECT_NAME -f /repo/docker-compose.yml"
+echo "updater: watching branch '$BRANCH' every ${INTERVAL}s (project=$PROJECT_NAME)"
 
 while true; do
   sleep "$INTERVAL"
@@ -55,8 +63,8 @@ while true; do
   # Rebuild only the app service and recreate it
   # --no-deps avoids restarting the updater itself
   COMMIT=$(git rev-parse --short HEAD)
-  docker compose build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
-  docker compose up -d --no-deps addon-manager 2>&1
+  $COMPOSE build --build-arg "GIT_COMMIT=$COMMIT" addon-manager 2>&1
+  $COMPOSE up -d --no-deps addon-manager 2>&1
 
   echo "updater: done, app restarted with $(git rev-parse --short HEAD)"
 done
