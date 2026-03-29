@@ -69,16 +69,7 @@ export function queryBedrockServer(host: string, port: number, timeoutMs = 3000)
  * Tries the itzg `send-command` helper first, falls back to other methods.
  */
 export async function getPlayerNames(container: Dockerode.Container): Promise<string[]> {
-  // Try itzg's send-command helper
-  let output = await execInContainer(container, ["send-command", "list"]);
-
-  if (!output) {
-    // Fallback: try using bedrock_server directly via stdin
-    output = await execInContainer(container, [
-      "sh", "-c", "echo 'list' | timeout 2 cat > /proc/1/fd/0 && sleep 1 && tail -5 /data/logs/latest.log 2>/dev/null || true",
-    ]);
-  }
-
+  const output = await sendServerCommand(container, "list");
   if (!output) return [];
 
   // Parse "There are X/Y players online:\nPlayer1, Player2"
@@ -112,10 +103,23 @@ export async function getPlayerNames(container: Dockerode.Container): Promise<st
 
 /**
  * Send a console command to a Bedrock server container.
- * Uses itzg's send-command helper.
+ * Tries itzg's send-command helper first, falls back to Docker attach.
  */
 export async function sendCommand(container: Dockerode.Container, command: string): Promise<string | null> {
-  return execInContainer(container, ["send-command", command]);
+  return sendServerCommand(container, command);
+}
+
+/**
+ * Universal command sender: tries send-command (itzg), falls back to Docker attach.
+ */
+async function sendServerCommand(container: Dockerode.Container, command: string): Promise<string | null> {
+  // Try itzg's send-command first
+  const output = await execInContainer(container, ["send-command", command]);
+  if (output && !output.includes("executable file not found")) {
+    return output;
+  }
+  // Fallback to Docker attach
+  return sendViaStdin(container, command);
 }
 
 /**
@@ -153,21 +157,12 @@ export async function getOperators(container: Dockerode.Container, basePath: str
  */
 export async function getPlayerCount(container: Dockerode.Container): Promise<{ playerCount: number; maxPlayers: number }> {
   try {
-    // Try send-command first (itzg images)
-    let output = await execInContainer(container, ["send-command", "list"]);
-
-    // Fallback: send "list" via stdin and read from the log
-    if (!output || output.includes("executable file not found")) {
-      output = await sendViaStdin(container, "list");
-    }
-
-    console.log(`getPlayerCount: output = ${JSON.stringify(output?.substring(0, 200))}`);
+    const output = await sendServerCommand(container, "list");
     if (!output) return { playerCount: 0, maxPlayers: 0 };
 
     for (const line of output.split("\n")) {
       const match = line.match(/There are (\d+)\/(\d+) players online/i);
       if (match) {
-        console.log(`getPlayerCount: found ${match[1]}/${match[2]} players`);
         return {
           playerCount: parseInt(match[1], 10),
           maxPlayers: parseInt(match[2], 10),
