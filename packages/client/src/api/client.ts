@@ -224,6 +224,19 @@ export async function getWorldMapMeta(serverId: string): Promise<MapMeta> {
   return apiFetch(`/servers/${serverId}/map/meta`);
 }
 
+export interface PlayerPosition {
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+  dimension: number;
+}
+
+export async function getPlayerPositions(serverId: string): Promise<PlayerPosition[]> {
+  const data = await apiFetch<{ players: PlayerPosition[] }>(`/servers/${serverId}/players`);
+  return data.players;
+}
+
 // Settings
 export async function getSettingsApi(): Promise<ServerDefaults> {
   return apiFetch("/settings");

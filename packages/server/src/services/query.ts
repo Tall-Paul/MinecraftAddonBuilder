@@ -9,6 +9,14 @@ export interface ServerStatus {
   players: string[];
 }
 
+export interface PlayerPosition {
+  name: string;
+  x: number;
+  y: number;
+  z: number;
+  dimension: number;
+}
+
 /**
  * Query a Bedrock server's status via the RakNet Unconnected Ping protocol.
  * Returns player count and max players. Works on any reachable Bedrock server.
@@ -99,6 +107,45 @@ export async function getPlayerNames(container: Dockerode.Container): Promise<st
   }
 
   return [];
+}
+
+/**
+ * Get player positions using querytarget @a and correlate with player names.
+ */
+export async function getPlayerPositions(container: Dockerode.Container): Promise<PlayerPosition[]> {
+  // Get names and positions in parallel
+  const [names, posOutput] = await Promise.all([
+    getPlayerNames(container),
+    sendServerCommand(container, "querytarget @a"),
+  ]);
+
+  if (!posOutput) return [];
+
+  // Parse the querytarget JSON from the console output
+  // Output may contain log prefixes like "[timestamp INFO]" before the JSON
+  const jsonMatch = posOutput.match(/\[[\s\S]*?\{[\s\S]*?"position"[\s\S]*?\}[\s\S]*?\]/);
+  if (!jsonMatch) {
+    console.log(`getPlayerPositions: no JSON found in output: ${posOutput.substring(0, 200)}`);
+    return [];
+  }
+
+  let targets: Array<{ dimension: number; position: { x: number; y: number; z: number }; uniqueId: string }>;
+  try {
+    targets = JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.log(`getPlayerPositions: failed to parse JSON: ${err}`);
+    return [];
+  }
+
+  // Correlate: querytarget returns UUIDs, list returns names.
+  // If same number, match by order. Otherwise just pair what we can.
+  return targets.map((t, i) => ({
+    name: names[i] || `Player ${i + 1}`,
+    x: Math.round(t.position.x),
+    y: Math.round(t.position.y),
+    z: Math.round(t.position.z),
+    dimension: t.dimension,
+  }));
 }
 
 /**

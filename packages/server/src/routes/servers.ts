@@ -229,6 +229,19 @@ router.get("/:id/map", async (req, res) => {
   }
 });
 
+// GET /api/servers/:id/players — Get player positions for live map overlay
+router.get("/:id/players", async (req, res) => {
+  try {
+    const docker = getDockerInstance();
+    const container = docker.getContainer(req.params.id);
+    const { getPlayerPositions } = await import("../services/query.js");
+    const players = await getPlayerPositions(container);
+    res.json({ players });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/servers/:id/start
 router.post("/:id/start", async (req, res) => {
   try {

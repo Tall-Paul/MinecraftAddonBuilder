@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Map, Loader2, RefreshCw, ZoomOut, Crosshair } from "lucide-react";
-import { getWorldMapUrl, getWorldMapMeta } from "../api/client.js";
-import type { MapMeta, MapAreaParams } from "../api/client.js";
+import { getWorldMapUrl, getWorldMapMeta, getPlayerPositions } from "../api/client.js";
+import type { MapMeta, MapAreaParams, PlayerPosition } from "../api/client.js";
 
 interface Props {
   serverId: string;
@@ -17,6 +17,26 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
   const [zoomArea, setZoomArea] = useState<MapAreaParams | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Player positions
+  const [players, setPlayers] = useState<PlayerPosition[]>([]);
+
+  // Poll player positions every 5 seconds when map is visible and server is running
+  useEffect(() => {
+    if (serverStatus !== "running" || !meta || !mapUrl) return;
+    let active = true;
+
+    async function poll() {
+      try {
+        const pos = await getPlayerPositions(serverId);
+        if (active) setPlayers(pos);
+      } catch { /* ignore */ }
+    }
+
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => { active = false; clearInterval(interval); };
+  }, [serverId, serverStatus, meta, mapUrl]);
 
   // Selection rectangle state
   const [selecting, setSelecting] = useState(false);
@@ -48,6 +68,28 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
     setZoomArea(null);
     setMapUrl(getWorldMapUrl(serverId, false));
   }
+
+  // Convert block coords to percentage position on the image
+  const blockToPercent = useCallback(
+    (blockX: number, blockZ: number) => {
+      if (!meta) return null;
+      const pctX = ((blockX - meta.blockMinX) / (meta.blockMaxX - meta.blockMinX)) * 100;
+      const pctZ = ((blockZ - meta.blockMinZ) / (meta.blockMaxZ - meta.blockMinZ)) * 100;
+      return { left: pctX, top: pctZ };
+    },
+    [meta],
+  );
+
+  // For zoomed views, convert block coords relative to the zoom area
+  const blockToPercentZoomed = useCallback(
+    (blockX: number, blockZ: number) => {
+      if (!zoomArea) return null;
+      const pctX = ((blockX - zoomArea.blockX) / zoomArea.blockW) * 100;
+      const pctZ = ((blockZ - zoomArea.blockZ) / zoomArea.blockH) * 100;
+      return { left: pctX, top: pctZ };
+    },
+    [zoomArea],
+  );
 
   // Convert pixel coords on the displayed image to block coords
   const pixelToBlocks = useCallback(
@@ -279,6 +321,32 @@ export default function WorldMap({ serverId, serverStatus }: Props) {
             {selecting && getSelectionStyle() && (
               <div style={getSelectionStyle()!} />
             )}
+            {/* Player markers */}
+            {players.filter(p => p.dimension === 0).map((player) => {
+              const pos = isOverview
+                ? blockToPercent(player.x, player.z)
+                : blockToPercentZoomed(player.x, player.z);
+              if (!pos) return null;
+              // Hide markers outside the visible area
+              if (pos.left < -2 || pos.left > 102 || pos.top < -2 || pos.top > 102) return null;
+              return (
+                <div
+                  key={player.name}
+                  className="absolute pointer-events-none"
+                  style={{ left: `${pos.left}%`, top: `${pos.top}%`, transform: "translate(-50%, -100%)" }}
+                >
+                  <div className="relative group pointer-events-auto">
+                    {/* Pin marker */}
+                    <div className="w-3 h-3 bg-blue-500 border-2 border-white rounded-full shadow-lg" />
+                    {/* Name tooltip */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-0.5 bg-gray-900/90 text-white text-xs rounded whitespace-nowrap">
+                      {player.name}
+                      <span className="text-gray-400 ml-1">({player.x}, {player.z})</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
