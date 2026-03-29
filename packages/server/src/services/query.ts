@@ -217,15 +217,13 @@ async function sendViaStdin(container: Dockerode.Container, command: string): Pr
           clearTimeout(timeout);
           try { stream.end(); } catch { /* ignore */ }
 
-          let raw = Buffer.concat(chunks);
+          const raw = Buffer.concat(chunks);
 
           // If not TTY, Docker multiplexes the stream with 8-byte frame headers
-          if (!isTty) {
-            raw = demuxDockerStream(raw);
-          }
+          const data = isTty ? raw : demuxDockerStream(raw);
 
           // Strip ANSI escape sequences and control characters
-          const output = raw.toString("utf-8")
+          const output = data.toString("utf-8")
             .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "") // ANSI escape sequences
             .replace(/\r/g, "")                      // carriage returns
             .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ""); // other control chars
@@ -239,7 +237,7 @@ async function sendViaStdin(container: Dockerode.Container, command: string): Pr
 }
 
 /** Demultiplex Docker attach stream (strip 8-byte frame headers). */
-function demuxDockerStream(buf: Buffer): Buffer<ArrayBufferLike> {
+function demuxDockerStream(buf: Buffer) {
   const parts: Buffer[] = [];
   let offset = 0;
   while (offset + 8 <= buf.length) {
